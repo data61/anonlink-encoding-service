@@ -77,3 +77,14 @@ Possibly delete pii or clks?
 DELETE /api/projects/{someprojectid}/clks
 ```
 
+# Running
+
+$ pip install -r requirements.txt
+$ FLASK_APP=server.py flask run
+
+
+Basic test
+
+    python example_usage.py
+    
+    
