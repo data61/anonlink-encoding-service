@@ -1,0 +1,126 @@
+openapi: 3.0.0
+
+info:
+  title: Clkhash REST API
+  version: 0.0.1
+  description: A simple REST wrapper around clkhash.
+
+  contact:
+    name: Jakub Nabaglo
+    url: http://people.csiro.au/N/J/Jakub-Nabaglo
+    email: jakub.nabaglo@data61.csiro.au
+
+paths:
+  /projects/:
+    get:
+      summary: List existing linkage projects.
+      operationId: clkhash_service.get_projects
+      responses:
+        200:
+          description: List of linkage projects.
+
+  /projects/{project_id}:
+    parameters:
+      - $ref: '#/components/parameters/project_id'
+
+    post:
+      summary: Add a new linkage project.
+      operationId: clkhash_service.post_project
+      parameters:
+        - name: schema
+          in: header
+          required: true
+        - name: keys
+          in: header
+          required: true
+      responses:
+        201:
+          description: Successfully created project.
+        409:
+          description: Project with this ID already exists.
+        422:
+          description: The schema is not valid.
+
+    get:
+      summary: Retrieve properties of the specified project.
+      operationId: clkhash_service.get_project
+      responses:
+        200:
+          description: Properties of specified object.
+
+    delete:
+      summary: Delete the linkage project.
+      operationId: clkhash_service.delete_project
+      responses:
+        202:
+          description: Marked for deletion.
+        204:
+          description: Successfully deleted.
+
+  /projects/{project_id}/clks:
+    parameters:
+      - $ref: '#/components/parameters/project_id'
+
+    get:
+      summary: Get status of all clks.
+      operationId: clkhash_service.get_clks_status
+      responses:
+        200:
+          description: List of clks along with status.
+
+  /projects/{project_id}/clks/{clk_start_index}/{clk_number}:
+    parameters:
+      - $ref: '#/components/parameters/project_id'
+      - name: clk_start_index
+        in: path
+        description: The index of the first clk to operate on.
+        required: true
+      - name: clk_number
+        in: path
+        description: The number of clks to operate on.
+        required: true
+
+    post:
+      summary: Post PII to hash.
+      operationId: clkhash_service.post_pii
+      parameters:
+        - name: pii_table
+          in: header
+          required: true
+        - name: validate
+          description: 'If `true`, validate the PII before hashing. Default `true`.'
+          in: header
+          required: false
+      responses:
+        202:
+          description: Successfully sent for hashing.
+
+    get:
+      summary: Retrieve the clks, if available.
+      operationId: clkhash_service.get_clks
+      responses:
+        102:
+          description: The clks are still being processed.
+        200:
+          description: The clks are available and returned.
+        207:
+          description: Some of the clks are available. Details listed.
+        422:
+          description: The PII submitted did not satisfy the schema.
+
+    delete:
+      summary: If finished hashing, delete the clks. Otherwise, abandon hashing and delete the PII.
+      operationId: clkhash_service.delete_clks
+      responses:
+        202:
+          description: Marked for deletion.
+        204:
+          description: Successfully deleted.
+
+components:
+  parameters:
+    project_id:
+      name: project_id
+      in: path
+      description: The ID of the linkage project. Must be unique.
+      required: true
