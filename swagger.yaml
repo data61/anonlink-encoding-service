@@ -1,14 +1,17 @@
-openapi: 3.0.0
+swagger: '2.0'
 
 info:
   title: Clkhash REST API
-  version: 0.0.1
+  version: 0.0.2
   description: A simple REST wrapper around clkhash.
 
   contact:
     name: Jakub Nabaglo
     url: http://people.csiro.au/N/J/Jakub-Nabaglo
     email: jakub.nabaglo@data61.csiro.au
+
+schemes:
+  - http
 
 paths:
   /projects/:
@@ -21,17 +24,28 @@ paths:
 
   /projects/{project_id}:
     parameters:
-      - $ref: '#/components/parameters/project_id'
+      - $ref: '#/parameters/project_id'
 
     post:
       summary: Add a new linkage project.
       operationId: clkhash_service.post_project
+      consumes:
+        - multipart/form-data
       parameters:
         - name: schema
-          in: header
+          in: formData
+          type: file
+          format: application/json
           required: true
         - name: keys
-          in: header
+          in: formData
+          type: array
+          collectionFormat: csv
+          items:
+            type: string
+            format: byte
+          minItems: 2
+          maxItems: 2
           required: true
       responses:
         201:
@@ -59,7 +73,7 @@ paths:
 
   /projects/{project_id}/clks:
     parameters:
-      - $ref: '#/components/parameters/project_id'
+      - $ref: '#/parameters/project_id'
 
     get:
       summary: Get status of all clks.
@@ -70,27 +84,37 @@ paths:
 
   /projects/{project_id}/clks/{clk_start_index}/{clk_number}:
     parameters:
-      - $ref: '#/components/parameters/project_id'
+      - $ref: '#/parameters/project_id'
       - name: clk_start_index
         in: path
         description: The index of the first clk to operate on.
         required: true
+        type: integer
+        minimum: 0
       - name: clk_number
         in: path
         description: The number of clks to operate on.
         required: true
+        type: integer
+        minimum: 1
 
     post:
       summary: Post PII to hash.
       operationId: clkhash_service.post_pii
+      consumes:
+        - text/csv
       parameters:
         - name: pii_table
-          in: header
+          in: body
           required: true
+          schema:
+            type: string
         - name: validate
-          description: 'If `true`, validate the PII before hashing. Default `true`.'
-          in: header
+          description: 'If `true`, validate the PII before hashing.'
+          in: query
+          type: boolean
           required: false
+          default: true
       responses:
         202:
           description: Successfully sent for hashing.
@@ -117,10 +141,10 @@ paths:
         204:
           description: Successfully deleted.
 
-components:
-  parameters:
-    project_id:
-      name: project_id
-      in: path
-      description: The ID of the linkage project. Must be unique.
-      required: true
+parameters:
+  project_id:
+    name: project_id
+    in: path
+    description: The ID of the linkage project. Must be unique.
+    required: true
+    type: string
