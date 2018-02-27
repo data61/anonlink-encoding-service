@@ -30,22 +30,19 @@ paths:
       summary: Add a new linkage project.
       operationId: clkhash_service.post_project
       consumes:
-        - multipart/form-data
+        - application/json
       parameters:
         - name: schema
-          in: formData
-          type: file
-          format: application/json
+          in: body
           required: true
-        - name: keys
-          in: formData
-          type: array
-          collectionFormat: csv
-          items:
-            type: string
-            format: byte
-          minItems: 2
-          maxItems: 2
+          schema: {}
+        - name: key1
+          in: query
+          type: string
+          required: true
+        - name: key2
+          in: query
+          type: string
           required: true
       responses:
         201:
