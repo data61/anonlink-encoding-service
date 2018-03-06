@@ -11,20 +11,16 @@ import flask_pymongo
 import pymongo
 
 import clkhash_worker
+from common import (CLK_DONE, CLK_ERROR, CLK_INVALID_DATA,
+                    CLK_IN_PROGRESS, CLK_QUEUED, MONGO_DB_URI)
 
 
 CHUNK_SIZE = 1000
 
-CLK_QUEUED = 'queued'
-CLK_IN_PROGRESS = 'in progress'
-CLK_DONE = 'done'
-CLK_INVALID_DATA = 'invalid data'
-CLK_ERROR = 'error'
-
 connexion_app = connexion.App(__name__)
 flask_app = connexion_app.app
 
-flask_app.config['MONGO_URI'] = 'mongodb://localhost:27017/admin'
+flask_app.config['MONGO_URI'] = MONGO_DB_URI
 mongo = flask_pymongo.PyMongo(flask_app)
 
 BAD_ID_RESPONSE = Response(response='Error: no such project.',
@@ -203,7 +199,7 @@ def post_pii(project_id, pii_table, header, validate):
         # Project deleted while we were inserting. Clean up.
         mongo.db.clks.delete_many({'project_id': project_id})
         abort(BAD_ID_RESPONSE)
-        
+
     clk_indices = range(start_index, start_index + len(pii_table))
     for i in range(0, clk_indices.stop - clk_indices.start, CHUNK_SIZE):
         this_indices = clk_indices[i:i + CHUNK_SIZE]

@@ -6,13 +6,15 @@ import clkhash
 from clkhash.schema import Schema
 from pymongo import MongoClient, UpdateOne
 
-app = Celery('clkhash_worker', broker='mongodb://localhost:27017/')
+from common import CLK_DONE, CLK_ERROR, MONGO_SERVER_URI, MONGO_DB
+
+app = Celery('clkhash_worker', broker=MONGO_SERVER_URI)
 
 
 @app.task
 def hash(project_id, validate, start_index, count):
-    with MongoClient('mongodb://localhost:27017/') as mongo:
-        db = mongo.admin
+    with MongoClient(MONGO_SERVER_URI) as mongo:
+        db = getattr(mongo, MONGO_DB)
         try:
             # You might wonder why the database connection is not
             # within this massive try block. If we error without an
@@ -65,7 +67,7 @@ def hash(project_id, validate, start_index, count):
                 [UpdateOne(
                     {'project_id': project_id,
                      'index': c['index']},
-                    {'$set': {'hash': h, 'pii': None, 'status': 'done'}})
+                    {'$set': {'hash': h, 'pii': None, 'status': CLK_DONE}})
                  for c, h in zip(clks_to_process, hash_bytes)])
 
         except BaseException as e:
@@ -81,7 +83,7 @@ def hash(project_id, validate, start_index, count):
                     '$set': {
                         'hash': None,
                         'pii': None,
-                        'status': 'error',
+                        'status': CLK_ERROR,
                         'errmsg': str(e)
                     }
                 })
