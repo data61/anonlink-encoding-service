@@ -63,12 +63,12 @@ paths:
       summary: Delete the linkage project.
       operationId: clkhash_service.delete_project
       responses:
+        200:
+          description: Successfully deleted.
         202:
           description: Marked for deletion.
-        204:
-          description: Successfully deleted.
 
-  /projects/{project_id}/clks:
+  /projects/{project_id}/clks/:
     parameters:
       - $ref: '#/parameters/project_id'
 
@@ -78,6 +78,33 @@ paths:
       responses:
         200:
           description: List of clks along with status.
+
+    post:
+      summary: Post PII to hash.
+      operationId: clkhash_service.post_pii
+      consumes:
+        - text/csv
+      parameters:
+        - name: pii_table
+          in: body
+          required: true
+          schema:
+            type: string
+        - name: header
+          description: 'Set to `true` if the csv input has a header row.'
+          in: query
+          type: boolean
+          required: false
+          default: false
+        - name: validate
+          description: 'If `true`, validate the PII before hashing.'
+          in: query
+          type: boolean
+          required: false
+          default: true
+      responses:
+        202:
+          description: Successfully sent for hashing.
 
   /projects/{project_id}/clks/{clk_start_index}/{clk_number}:
     parameters:
@@ -94,27 +121,6 @@ paths:
         required: true
         type: integer
         minimum: 1
-
-    post:
-      summary: Post PII to hash.
-      operationId: clkhash_service.post_pii
-      consumes:
-        - text/csv
-      parameters:
-        - name: pii_table
-          in: body
-          required: true
-          schema:
-            type: string
-        - name: validate
-          description: 'If `true`, validate the PII before hashing.'
-          in: query
-          type: boolean
-          required: false
-          default: true
-      responses:
-        202:
-          description: Successfully sent for hashing.
 
     get:
       summary: Retrieve the clks, if available.
