@@ -1,89 +1,78 @@
-import operator
+import os
 
-from bitarray import bitarray
 from celery import Celery
 import clkhash
 from clkhash.schema import Schema
-from pymongo import MongoClient, UpdateOne
+import sqlalchemy.orm
 
-from common import CLK_DONE, CLK_ERROR, MONGO_SERVER_URI, MONGO_DB
+from database import (Clk, ClkStatus, db_session, Project)
 
-app = Celery('clkhash_worker', broker=MONGO_SERVER_URI)
+
+try:
+    _BROKER_URI = os.environ['CLK_SERVICE_BROKER_URI']
+except KeyError as _e:
+    _msg = 'Unset environment variable CLK_SERVICE_BROKER_URI.'
+    raise KeyError(_msg) from _e
+
+
+app = Celery('clkhash_worker', broker=_BROKER_URI)
 
 
 @app.task
 def hash(project_id, validate, start_index, count):
-    with MongoClient(MONGO_SERVER_URI) as mongo:
-        db = getattr(mongo, MONGO_DB)
+    try:
         try:
-            # You might wonder why the database connection is not
-            # within this massive try block. If we error without an
-            # active database connection, then there's really nothing
-            # we can do anyway except die.
+            project = db_session.query(Project).filter(
+                    Project.id == project_id
+                ).options(
+                    sqlalchemy.orm.load_only(Project.schema, Project.keys)
+                ).one()
+        except sqlalchemy.orm.exc.NoResultFound:
+            # Project must have been deleted.
+            return
 
-            project = db.projects.find_one(
-                project_id,
-                projection=dict(_id=False, key1=True, key2=True, schema=True))
+        schema = Schema.from_json_dict(project.schema)
+        key_lists = clkhash.key_derivation.generate_key_lists(
+            project.keys,
+            len(schema.fields),
+            key_size=schema.hashing_globals.kdf_key_size,
+            salt=schema.hashing_globals.kdf_salt,
+            info=schema.hashing_globals.kdf_info,
+            kdf=schema.hashing_globals.kdf_type,
+            hash_algo=schema.hashing_globals.kdf_hash)
 
-            if project is None:
-                # Project must have been deleted.
-                return
+        tokenizers = [clkhash.tokenizer.get_tokenizer(field.hashing_properties)
+              for field in schema.fields]
+        field_hashing = [field.hashing_properties for field in schema.fields]
+        hash_properties = schema.hashing_globals
 
-            schema = Schema.from_json_dict(project['schema'])
+        clks = db_session.query(Clk).filter(
+                Clk.project_id == project_id,
+                Clk.index >= start_index,
+                Clk.index < start_index + count
+            )
 
-            # Get PII
-            lookup_result = db.clks.find(
-                filter={
-                    'project_id': project_id,
-                    'index': {
-                        '$gte': start_index,
-                        '$lt': start_index + count
-                    }
-                },
-                projection=dict(_id=False, index=True, pii=True))
+        for c in clks:
+            # TODO: Validate
+            bf, _, _ = clkhash.bloomfilter.crypto_bloom_filter(
+                c.pii, tokenizers, field_hashing, key_lists, hash_properties)
+            c.hash = bf.tobytes()
+            c.pii = None
+            c.status = ClkStatus.CLK_DONE
 
-            clks_to_process = list(lookup_result)
-            if not clks_to_process:
-                # PII must have been deleted.
-                return
+        db_session.flush()
+        db_session.commit()
 
-            # TODO: Mark as in progress
-
-            pii = map(operator.itemgetter('pii'), clks_to_process)
-
-            keys = clkhash.key_derivation.generate_key_lists(
-                (project['key1'], project['key2']),
-                len(schema.fields))
-            hash_bitarrays = map(
-                operator.itemgetter(0),
-                clkhash.bloomfilter.stream_bloom_filters(
-                    pii,
-                    keys,
-                    schema))
-
-            hash_bytes = map(bitarray.tobytes, hash_bitarrays)
-
-            db.clks.bulk_write(
-                [UpdateOne(
-                    {'project_id': project_id,
-                     'index': c['index']},
-                    {'$set': {'hash': h, 'pii': None, 'status': CLK_DONE}})
-                 for c, h in zip(clks_to_process, hash_bytes)])
-
-        except BaseException as e:
-            db.clks.update_many(
-                {
-                    'project_id': project_id,
-                    'index': {
-                        '$gte': start_index,
-                        '$lt': start_index + count
-                    }
-                },
-                {
-                    '$set': {
-                        'hash': None,
-                        'pii': None,
-                        'status': CLK_ERROR,
-                        'errmsg': str(e)
-                    }
-                })
+    except BaseException as e:
+        clks = db_session.query(Clk).filter(
+                Clk.project_id == project_id,
+                Clk.index >= start_index,
+                Clk.index < start_index + count
+            ).update({
+                Clk.hash: None,
+                Clk.pii: None,
+                Clk.status: ClkStatus.CLK_ERROR,
+                Clk.err_msg: str(e)
+            })
+        db_session.commit()
+        raise

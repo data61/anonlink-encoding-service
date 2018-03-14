@@ -2,26 +2,25 @@ import base64
 import csv
 import functools
 import io
+import json
 
 import celery
 import clkhash
 import connexion
 from flask import abort, Response
-import flask_pymongo
-import pymongo
+import sqlalchemy
+import sqlalchemy.exc
+import sqlalchemy.orm
+import sqlalchemy.sql
 
 import clkhash_worker
-from common import (CLK_DONE, CLK_ERROR, CLK_INVALID_DATA,
-                    CLK_IN_PROGRESS, CLK_QUEUED, MONGO_DB_URI)
+from database import (Clk, ClkStatus, db_session, Project)
 
 
 CHUNK_SIZE = 1000
 
 connexion_app = connexion.App(__name__)
 flask_app = connexion_app.app
-
-flask_app.config['MONGO_URI'] = MONGO_DB_URI
-mongo = flask_pymongo.PyMongo(flask_app)
 
 BAD_ID_RESPONSE = Response(response='Error: no such project.',
                            status=404,
@@ -35,13 +34,9 @@ del DELETE_SUCCESS_RESPONSE.headers['Content-Type']
 
 
 def _does_project_exist(project_id):
-    project_found = mongo.db.projects.count(
-        dict(_id=project_id),
-        limit=1)
-
-    assert project_found in {0, 1}
-
-    return bool(project_found)
+    return db_session.query(
+            sqlalchemy.sql.exists().where(Project.id == project_id)
+        ).scalar()
 
 
 def _abort_if_project_not_found(fun):
@@ -56,68 +51,69 @@ def _abort_if_project_not_found(fun):
     return retval
 
 
-# Done
 def get_projects():
-    projects = mongo.db.projects.find({}, dict(_id=True))
+    project_ids = db_session.query(Project.id)
     return {
-        'projects': [p['_id'] for p in projects]
+        'projects': [id_ for id_, in project_ids]
     }
 
 
-# Done
 def post_project(project_id, schema, key1, key2):
     # Check that the schema is valid.
     try:
-        clkhash.schema.Schema.from_json_dict(schema)
-    except clkhash.schema.SchemaError as e:
-        msg, = e
+        clkhash.schema.validate_schema_dict(schema)
+    except (clkhash.schema.SchemaError,
+            json.decoder.JSONDecodeError) as e:
+        msg, *_ = e.args
         abort(Response(response='Invalid schema. {}'.format(msg),
                        status=422,
                        content_type='text/plain'))
 
+    project = Project(
+        id=project_id,
+        schema=schema,
+        keys=[key1, key2])
+    db_session.add(project)
+    
     try:
-        mongo.db.projects.insert(dict(
-            _id=project_id,
-            schema=schema,
-            key1=key1,
-            key2=key2,
-            clk_number=0))
-    except pymongo.errors.DuplicateKeyError:
+        db_session.flush()
+    except sqlalchemy.exc.IntegrityError:
         abort(Response(response='Error: non-unique ID.',
                        status=409,
                        content_type='text/plain'))
-    else:
-        return POST_SUCCESS_RESPONSE
+    db_session.commit()
+    
+    return POST_SUCCESS_RESPONSE
 
 
-# Done
 def get_project(project_id):
-    project = mongo.db.projects.find_one(
-        dict(_id=project_id),
-        projection=dict(_id=True, schema=True))
+    project = db_session.query(Project).options(
+            sqlalchemy.orm.load_only(Project.schema)
+        ).filter(
+            Project.id == project_id
+        ).one_or_none()
+
     if project is None:
         abort(BAD_ID_RESPONSE)
 
-    id_ = project['_id']
-    schema = project['schema']
-
     # Note that we're purposefully not exposing the keys.
     return {
-            'project_id': id_,
-            'schema': schema
+            'project_id': project_id,
+            'schema': project.schema
         }
 
 
-# Done
 def delete_project(project_id):
-    delete_result = mongo.db.projects.delete_one(dict(_id=project_id))
+    delete_count = db_session.query(Project).filter(
+            Project.id == project_id
+        ).delete()
 
-    delete_count = delete_result.deleted_count
     if delete_count == 0:
         abort(BAD_ID_RESPONSE)
     elif delete_count == 1:
         # Delete clks also.
-        mongo.db.clks.delete_many({'project_id': project_id})
+        db_session.query(Clk).filter(Clk.project_id == project_id).delete()
+        db_session.commit()
 
         return DELETE_SUCCESS_RESPONSE
     else:
@@ -127,11 +123,13 @@ def delete_project(project_id):
             .format())
 
 
-# Done
 @_abort_if_project_not_found
 def get_clks_status(project_id):
-    clks = mongo.db.clks.find({'project_id': project_id},
-                              {'status': True, 'index':True})
+    clks = db_session.query(Clk).filter(
+            Clk.project_id == project_id
+        ).options(
+            sqlalchemy.orm.load_only(Clk.index, Clk.status)
+        )
 
     clks_iter = iter(clks)
     try:
@@ -143,25 +141,24 @@ def get_clks_status(project_id):
     groups = []
     count = 1
     for clk in clks_iter:
-        if (clk['index'] == group_start['index'] + count
-                and clk['status'] == group_start['status']):
+        if (clk.index == group_start.index + count
+                and clk.status == group_start.status):
             count += 1
         else:
             groups.append(dict(
-                status=group_start['status'],
-                index=group_start['index'],
+                status=group_start.status.value,
+                index=group_start.index,
                 count=count))
             group_start = clk
             count = 1
     groups.append(dict(
-        status=group_start['status'],
-        index=group_start['index'],
+        status=group_start.status.value,
+        index=group_start.index,
         count=count))
 
     return {'clks_status': groups}
 
 
-# Done
 @_abort_if_project_not_found
 def post_pii(project_id, pii_table, header, validate):
     pii_table = pii_table.decode('utf-8')
@@ -175,31 +172,36 @@ def post_pii(project_id, pii_table, header, validate):
     pii_table = list(reader)
 
     # Atomically increase clk counter to reserve space for pii.
-    start_index_result = mongo.db.projects.find_one_and_update(
-        dict(_id=project_id),
-        {'$inc': dict(clk_number=len(pii_table))},
-        dict(_id=False, clk_number=True)
-    )
-    if start_index_result is None:
+    stmt = sqlalchemy.update(Project).where(
+            Project.id == project_id
+        ).values(
+            clk_count=Project.clk_count + len(pii_table)
+        ).returning(Project.clk_count)
+    result = db_session.execute(stmt)
+    db_session.commit()
+    start_index = result.scalar()
+
+    if start_index is None:
         abort(BAD_ID_RESPONSE)
 
-    start_index = start_index_result['clk_number']
-    mongo.db.clks.insert([dict(
-            project_id=project_id,
-            index=i,
-            status=CLK_QUEUED,
-            err_msg=None,
-            pii=row,
-            hash=None)
-        for i, row in enumerate(pii_table, start=start_index)])
+    # Add PII to db.
+    for i, row in enumerate(pii_table, start=start_index):
+        clk = Clk(
+                project_id=project_id,
+                index=i,
+                status=ClkStatus.CLK_QUEUED,
+                pii=row
+            )
+        db_session.add(clk)
 
-    # Check if project *still* exists to avoid race conditions.
-    # (This is where foreign keys would be useful...)
-    if not _does_project_exist(project_id):
-        # Project deleted while we were inserting. Clean up.
-        mongo.db.clks.delete_many({'project_id': project_id})
+    try:
+        db_session.flush()
+    except sqlalchemy.exc.IntegrityError:
+        # Project deleted in the meantime. All good, we'll just abort.
         abort(BAD_ID_RESPONSE)
+    db_session.commit()
 
+    # Queue up for the worker.
     clk_indices = range(start_index, start_index + len(pii_table))
     for i in range(0, clk_indices.stop - clk_indices.start, CHUNK_SIZE):
         this_indices = clk_indices[i:i + CHUNK_SIZE]
@@ -211,49 +213,44 @@ def post_pii(project_id, pii_table, header, validate):
     return dict(clk_start_index=start_index, clk_number=len(pii_table))
 
 
-# Done
 @_abort_if_project_not_found
 def get_clks(project_id, clk_start_index, clk_number):
-    clks = mongo.db.clks.find(
-        filter={
-            'project_id': project_id,
-            'index': {
-                '$gte': clk_start_index,
-                '$lt': clk_start_index + clk_number
-            }
-        },
-        projection=dict(_id=False, index=True, status=True,
-                        err_msg=True, hash=True))
+    clks = db_session.query(Clk).filter(
+            Clk.project_id == project_id,
+            Clk.index >= clk_start_index,
+            Clk.index < clk_start_index + clk_number
+        ).options(
+            sqlalchemy.orm.load_only(Clk.index, Clk.status,
+                                     Clk.err_msg, Clk.hash)
+        )
 
     return {
         'clks': [{
-            'index': c['index'],
-            'status': c['status'],
-            'errMsg': c['err_msg'],
-            'hash': base64.b64encode(c['hash']).decode('ascii')
-                    if c['hash'] is not None
+            'index': c.index,
+            'status': c.status.value,
+            'errMsg': c.err_msg,
+            'hash': base64.b64encode(c.hash).decode('ascii')
+                    if c.hash is not None
                     else None
         } for c in clks]
     }
 
 
-# Done
 @_abort_if_project_not_found
 def delete_clks(project_id, clk_start_index, clk_number):
-    project_found = mongo.db.projects.count(
-        dict(_id=project_id),
-        limit=1)
-    if not project_found:
-        abort(BAD_ID_RESPONSE)
+    db_session.query(Clk).filter(
+            Clk.project_id == project_id,
+            Clk.index >= clk_start_index,
+            Clk.index < clk_start_index + clk_number
+        ).delete()
+    db_session.commit()
 
-    mongo.db.clks.delete_many({
-            'project_id': project_id,
-            'index': {
-                '$gte': clk_start_index,
-                '$lt': clk_start_index + clk_number
-            }
-        })
     return DELETE_SUCCESS_RESPONSE
+
+
+@flask_app.teardown_appcontext
+def shutdown_session(exception=None):
+    db_session.remove()
 
 
 if __name__ == '__main__':
