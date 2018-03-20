@@ -2,22 +2,34 @@ swagger: '2.0'
 
 info:
   title: Clkhash REST API
-  version: 0.0.2
+  version: 0.0.3
   description: A simple REST wrapper around clkhash.
 
   contact:
-    name: Jakub Nabaglo
-    url: http://people.csiro.au/N/J/Jakub-Nabaglo
+    name: N1 Analytics
+    url: https://github.com/n1analytics/clkhash-service
     email: jakub.nabaglo@data61.csiro.au
 
 schemes:
   - http
 
+tags:
+  - name: project
+    description: TODO
+
+  - name: clk
+    description: TODO
+
 paths:
   /projects/:
     get:
       summary: List existing linkage projects.
+      description: Lists the IDs of existing linkage projects. Every linkage project has a unique ID. To retrieve more information about a project, use `/projects/{project_id}`.
+      tags:
+        - projects
       operationId: clkhash_service.get_projects
+      produces:
+        - application/json
       responses:
         200:
           description: List of linkage projects.
@@ -28,6 +40,9 @@ paths:
 
     post:
       summary: Add a new linkage project.
+      description: TODO
+      tags:
+        - projects
       operationId: clkhash_service.post_project
       consumes:
         - application/json
@@ -54,6 +69,9 @@ paths:
 
     get:
       summary: Retrieve properties of the specified project.
+      description: TODO
+      tags:
+        - projects
       operationId: clkhash_service.get_project
       responses:
         200:
@@ -61,6 +79,9 @@ paths:
 
     delete:
       summary: Delete the linkage project.
+      description: TODO
+      tags:
+        - projects
       operationId: clkhash_service.delete_project
       responses:
         200:
@@ -74,6 +95,9 @@ paths:
 
     get:
       summary: Get status of all clks.
+      description: TODO
+      tags:
+        - projects
       operationId: clkhash_service.get_clks_status
       responses:
         200:
@@ -81,6 +105,9 @@ paths:
 
     post:
       summary: Post PII to hash.
+      description: TODO
+      tags:
+        - projects
       operationId: clkhash_service.post_pii
       consumes:
         - text/csv
@@ -124,6 +151,9 @@ paths:
 
     get:
       summary: Retrieve the clks, if available.
+      description: TODO
+      tags:
+        - projects
       operationId: clkhash_service.get_clks
       responses:
         102:
@@ -137,6 +167,9 @@ paths:
 
     delete:
       summary: If finished hashing, delete the clks. Otherwise, abandon hashing and delete the PII.
+      description: TODO
+      tags:
+        - projects
       operationId: clkhash_service.delete_clks
       responses:
         202:

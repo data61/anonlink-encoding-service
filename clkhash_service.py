@@ -3,6 +3,7 @@ import csv
 import functools
 import io
 import json
+import os
 
 import celery
 import clkhash
@@ -129,7 +130,7 @@ def get_clks_status(project_id):
             Clk.project_id == project_id
         ).options(
             sqlalchemy.orm.load_only(Clk.index, Clk.status)
-        )
+        ).order_by(Clk.index)
 
     clks_iter = iter(clks)
     try:
@@ -255,4 +256,5 @@ def shutdown_session(exception=None):
 
 if __name__ == '__main__':
     connexion_app.add_api('swagger.yaml')
-    connexion_app.run(port=8080, debug=True)
+    connexion_app.run(port=int(os.environ.get('PORT', 8080)),
+                      debug=True)
