@@ -15,10 +15,10 @@ schemes:
 
 tags:
   - name: project
-    description: TODO
+    description: A project is a namespace associated with a schema and keys. All uploaded data must belong to a project. Before uploading any private data, a project with some ID assigned by the user must be created.
 
   - name: clk
-    description: TODO
+    description: These methods operate on the data and the hashes, permitting us to upload private information, view progress of the hashing, retrieve the clks, and delete information.
 
 paths:
   /projects/:
@@ -33,6 +33,11 @@ paths:
       responses:
         200:
           description: List of linkage projects.
+          examples:
+            application/json:
+              projects:
+                - example-project
+                - another-project
 
   /projects/{project_id}:
     parameters:
@@ -40,7 +45,7 @@ paths:
 
     post:
       summary: Add a new linkage project.
-      description: TODO
+      description: Create a new project. This permits us to save the schema and keys in the server and bind all related private data to the same ID. The keys uploaded here cannot be retrieved from the server.
       tags:
         - projects
       operationId: clkhash_service.post_project
@@ -50,7 +55,48 @@ paths:
         - name: schema
           in: body
           required: true
-          schema: {}
+          schema:
+            example:
+              version: 1
+              clkConfig:
+                l: 1024
+                k: 20
+                hash:
+                  type: doubleHash
+                kdf:
+                  type: HKDF
+                  hash: SHA256
+                  salt: SCbL2zHNnmsckfzchsNkZY9XoHk96P/G5nUBrM7ybymlEFsMV6PAeDZCNp3rfNUPCtLDMOGQHG4pCQpfhiHCyA==
+                  info: c2NoZW1hX2V4YW1wbGU=
+                  keySize: 64
+              features:
+                - identifier: NAME freetext
+                  format:
+                    type: string
+                    encoding: utf-8
+                    case: mixed
+                    minLength: 3
+                  hashing:
+                    ngram: 2
+                    weight: 0.5
+                - identifier: DOB YYYY/MM/DD
+                  format:
+                    type: string
+                    encoding: ascii
+                    description: Numbers separated by slashes, in the year, month, day order
+                    pattern: \d\d\d\d/\d\d/\d\d
+                  hashing:
+                    ngram: 1
+                    positional: true
+                - identifier:
+                    format:
+                      type: enum
+                      values:
+                        - M
+                        - F
+                    hashing:
+                      ngram: 1
+                      weight: 2
         - name: key1
           in: query
           type: string
@@ -69,25 +115,73 @@ paths:
 
     get:
       summary: Retrieve properties of the specified project.
-      description: TODO
+      description: Retrieves the public properties (currently the schema) of the specified object.
       tags:
         - projects
       operationId: clkhash_service.get_project
       responses:
         200:
           description: Properties of specified object.
+          examples:
+            application/json:
+              project_id: example-project
+              schema:
+                version: 1
+                clkConfig:
+                  l: 1024
+                  k: 20
+                  hash:
+                    type: doubleHash
+                  kdf:
+                    type: HKDF
+                    hash: SHA256
+                    salt: SCbL2zHNnmsckfzchsNkZY9XoHk96P/G5nUBrM7ybymlEFsMV6PAeDZCNp3rfNUPCtLDMOGQHG4pCQpfhiHCyA==
+                    info: c2NoZW1hX2V4YW1wbGU=
+                    keySize: 64
+                features:
+                  - identifier: NAME freetext
+                    format:
+                      type: string
+                      encoding: utf-8
+                      case: mixed
+                      minLength: 3
+                    hashing:
+                      ngram: 2
+                      weight: 0.5
+                  - identifier: DOB YYYY/MM/DD
+                    format:
+                      type: string
+                      encoding: ascii
+                      description: Numbers separated by slashes, in the year, month, day order
+                      pattern: \d\d\d\d/\d\d/\d\d
+                    hashing:
+                      ngram: 1
+                      positional: true
+                  - identifier:
+                      format:
+                        type: enum
+                        values:
+                          - M
+                          - F
+                      hashing:
+                        ngram: 1
+                        weight: 2
+        404:
+          description: No such project.
 
     delete:
       summary: Delete the linkage project.
-      description: TODO
+      description: Deletes the linkage project, along with its schema and keys. This deletes any computed all hashes. If some hashing was still pending, those jobs are aborted.
       tags:
         - projects
       operationId: clkhash_service.delete_project
       responses:
-        200:
-          description: Successfully deleted.
         202:
           description: Marked for deletion.
+        204:
+          description: Successfully deleted.
+        404:
+          description: No such project.
 
   /projects/{project_id}/clks/:
     parameters:
@@ -95,19 +189,30 @@ paths:
 
     get:
       summary: Get status of all clks.
-      description: TODO
+      description: Returns the status of each click, along with its index. For convenience, adjacent clks with the same status are grouped together.
       tags:
-        - projects
+        - clks
       operationId: clkhash_service.get_clks_status
       responses:
         200:
           description: List of clks along with status.
+          examples:
+            application/json:
+              clks_status:
+                - count: 16002
+                  index: 0
+                  status: done
+                - count: 84000
+                  index: 16002
+                  status: queued
+        404:
+          description: No such project.
 
     post:
       summary: Post PII to hash.
-      description: TODO
+      description: Save private information to the server and schedule the hashing. The private information cannot be retrieved from the API in its original form; only the hashes are made available. It is deleted as soon as the hash is produced.
       tags:
-        - projects
+        - clks
       operationId: clkhash_service.post_pii
       consumes:
         - text/csv
@@ -117,6 +222,10 @@ paths:
           required: true
           schema:
             type: string
+            example: |
+              NAME freetext,DOB YYYY/MM/DD,GENDER M or F
+              Jane Doe,1968/05/19,F
+              Peter Griffin,1998/12/20,M
         - name: header
           description: 'Set to `true` if the csv input has a header row.'
           in: query
@@ -132,6 +241,12 @@ paths:
       responses:
         202:
           description: Successfully sent for hashing.
+          examples:
+            application/json:
+              clk_number: 2
+              clk_start_index: 0
+        404:
+          description: No such project.
 
   /projects/{project_id}/clks/{clk_start_index}/{clk_number}:
     parameters:
@@ -151,31 +266,38 @@ paths:
 
     get:
       summary: Retrieve the clks, if available.
-      description: TODO
+      description: Retrieve the index, status, and hash of each clk. Where the hash has not been computed it is `null`.
       tags:
-        - projects
+        - clks
       operationId: clkhash_service.get_clks
       responses:
-        102:
-          description: The clks are still being processed.
         200:
-          description: The clks are available and returned.
-        207:
-          description: Some of the clks are available. Details listed.
-        422:
-          description: The PII submitted did not satisfy the schema.
+          description: The clks are returned along with their status. The hash is missing where it has not been computed.
+          examples:
+            application/json: 
+              clks:
+                - errMsg: null
+                  hash: EgBsCgAQACwDiJiri8oACaApBgB2UigAYJAAADCECKjBgABKJFFNpBVGzMREZBGBmCIwAODcgqGI9hAFKAkndGAhAGClqQEEAiLue2siEJQgkUEggGBAAQgGAWAALZACtSAiABMMQlihFVU1MTHEAmlACIMGiIwCsCAoEEDQAAA=
+                  index: 0
+                  status: done
+                - errMsg: null
+                  hash: 2wRKwCio1SQDeAAEowBECdwNGkAJgChviDATAHTDRCgQECHqxiEARgl+iLQADIspmCB7gcFUgKGIwvCMBAirULh5kkDaiTlAJowckX8A0BEgk8MgkABIF2EmByhJK6AiMwCGjlGYIlCCwiQAICED4QEgBAMsIBiAMBDkGyCSQAI=
+                  index: 1
+                  status: done
+        404:
+          description: No such project.
 
     delete:
       summary: If finished hashing, delete the clks. Otherwise, abandon hashing and delete the PII.
-      description: TODO
+      description: Deletes specified entry from the server, including any hashes and private data. If the hashing has not occured, cancels the scheduled job.
       tags:
-        - projects
+        - clks
       operationId: clkhash_service.delete_clks
       responses:
-        202:
-          description: Marked for deletion.
         204:
           description: Successfully deleted.
+        404:
+          description: No such project.
 
 parameters:
   project_id:

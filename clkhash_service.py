@@ -180,7 +180,7 @@ def post_pii(project_id, pii_table, header, validate):
         ).returning(Project.clk_count)
     result = db_session.execute(stmt)
     db_session.commit()
-    start_index = result.scalar()
+    start_index = result.scalar() - len(pii_table)
 
     if start_index is None:
         abort(BAD_ID_RESPONSE)
@@ -211,7 +211,7 @@ def post_pii(project_id, pii_table, header, validate):
                                   this_indices.start,
                                   this_indices.stop - this_indices.start)
 
-    return dict(clk_start_index=start_index, clk_number=len(pii_table))
+    return dict(clk_start_index=start_index, clk_number=len(pii_table)), 202
 
 
 @_abort_if_project_not_found

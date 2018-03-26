@@ -3,6 +3,7 @@ import os
 from celery import Celery
 import clkhash
 from clkhash.schema import Schema
+import sqlalchemy.exc
 import sqlalchemy.orm
 
 from database import (Clk, ClkStatus, db_session, Project)
@@ -59,9 +60,14 @@ def hash(project_id, validate, start_index, count):
             c.hash = bf.tobytes()
             c.pii = None
             c.status = ClkStatus.CLK_DONE
-
-        db_session.flush()
-        db_session.commit()
+        
+        try:
+            db_session.flush()
+        except sqlalchemy.orm.exc.StaleDataError:
+            # These clks were deleted.
+            db_session.rollback()
+        else:
+            db_session.commit()
 
     except BaseException as e:
         clks = db_session.query(Clk).filter(
@@ -74,5 +80,6 @@ def hash(project_id, validate, start_index, count):
                 Clk.status: ClkStatus.CLK_ERROR,
                 Clk.err_msg: str(e)
             })
+        db_session.flush()
         db_session.commit()
         raise

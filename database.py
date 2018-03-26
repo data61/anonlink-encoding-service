@@ -4,7 +4,7 @@ import sys
 
 from sqlalchemy import (Column, create_engine, Enum, ForeignKey,
                         Integer, JSON, LargeBinary, String)
-from sqlalchemy.orm import scoped_session, sessionmaker
+from sqlalchemy.orm import relationship, scoped_session, sessionmaker
 from sqlalchemy.ext.declarative import declarative_base
 
 
@@ -42,7 +42,7 @@ class Project(Base):
 class Clk(Base):
     __tablename__ = 'clks'
 
-    project_id = Column(String, ForeignKey(Project.id), primary_key=True)
+    project_id = Column(String, ForeignKey(Project.id, ondelete="CASCADE"), primary_key=True)
     index = Column(Integer, primary_key=True)
     status = Column(Enum(ClkStatus), nullable=False)
     err_msg = Column(String)
