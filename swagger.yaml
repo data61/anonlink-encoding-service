@@ -261,13 +261,13 @@ paths:
     parameters:
       - $ref: '#/parameters/project_id'
       - name: index_range_start
-        in: path
+        in: query
         description: The index of the first clk to operate on.
         required: false
         type: integer
         minimum: 0
       - name: index_range_end
-        in: path
+        in: query
         description: The index of the last clk to operate on.
         required: false
         type: integer
