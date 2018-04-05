@@ -36,10 +36,6 @@ paths:
           examples:
             application/json: {"projects": ["example-project", "another-project"]}
 
-  /projects/{project_id}:
-    parameters:
-      - $ref: '#/parameters/project_id'
-
     post:
       summary: Add a new linkage project.
       description: Create a new project. This permits us to save the schema and keys in the server and bind all related private data to the same ID. The keys uploaded here cannot be retrieved from the server.
@@ -94,11 +90,19 @@ paths:
                     hashing:
                       ngram: 1
                       weight: 2
-        - name: key1
-          in: query
-          type: string
+        - name: project_id
+          in: path
+          description: The ID of the linkage project. Must be unique.
           required: true
-        - name: key2
+          type: string
+        - name: validate
+          description: 'If `true`, validate the PII before hashing.'
+          in: query
+          type: boolean
+          required: false
+          default: true
+        - name: keys
+          description: Comma-separated keys. Each key is a base64 string. These need to be URL-encoded since base64 is not URL-safe by default.
           in: query
           type: string
           required: true
@@ -109,6 +113,10 @@ paths:
           description: Project with this ID already exists.
         422:
           description: The parameters are not valid.
+
+  /projects/{project_id}:
+    parameters:
+      - $ref: '#/parameters/project_id'
 
     get:
       summary: Retrieve properties of the specified project.
@@ -121,7 +129,7 @@ paths:
           description: Properties of specified object.
           examples:
             application/json:
-              project_id: example-project
+              projectId: example-project
               schema:
                 version: 1
                 clkConfig:
@@ -224,7 +232,7 @@ paths:
         422:
           description: Invalid data. Details in payload.
 
-  /projects/{project_id}/clks/:
+  /projects/{project_id}/clks/status:
     parameters:
       - $ref: '#/parameters/project_id'
 
@@ -240,40 +248,53 @@ paths:
           examples:
             application/json:
               clks_status:
-                - range_start: 0
-                  range_end: 16003
+                - rangeStart: 0
+                  rangeEnd: 16003
                   status: done
-                - range_start: 16002
-                  range_end: 100003
+                - rangeStart: 16002
+                  rangeEnd: 100003
                   status: queued
         404:
           description: No such project.
 
-  /projects/{project_id}/clks/{range_start}/{range_end}:
+  /projects/{project_id}/clks:
     parameters:
       - $ref: '#/parameters/project_id'
-      - name: range_start
+      - name: index_range_start
         in: path
         description: The index of the first clk to operate on.
-        required: true
+        required: false
         type: integer
         minimum: 0
-      - name: range_end
+      - name: index_range_end
         in: path
-        description: The number of clks to operate on.
-        required: true
+        description: The index of the last clk to operate on.
+        required: false
         type: integer
-        minimum: 1
+        minimum: 0
 
     get:
       summary: Retrieve the clks, if available.
       description: Retrieve the index, status, and hash of each clk.
       tags:
         - clks
+      parameters:
+        - name: page_limit
+          in: query
+          description: The number of items per page. Leave this out to disable pagination.
+          required: false
+          type: integer
+          minimum: 1
+        - name: cursor
+          in: query
+          description: The cursor used to iterate through pages. This is returned by the previous response. Leave out to retrieve the first page.
+          required: false
+          type: string
+          minLength: 1
       operationId: clkhash_service.get_clks
       responses:
         200:
-          description: The clks are returned along with their status. The hash is `null` where it has not been computed. The list is empty if there are no clks with IDs in the specified range.
+          description: The clks are returned along with their status. The hash is `null` where it has not been computed. The list is empty if there are no clks with IDs in the specified range. A `responseMetadata` object is returned. It contains a `nextCursor` string which must be passed in the next request to retrieve the next page; it is URL-safe, so no URL encoding is required. The `nextCursor` is `null` if no next page is available.
           examples:
             application/json: 
               count: 2
@@ -286,8 +307,13 @@ paths:
                   hash: 2wRKwCio1SQDeAAEowBECdwNGkAJgChviDATAHTDRCgQECHqxiEARgl+iLQADIspmCB7gcFUgKGIwvCMBAirULh5kkDaiTlAJowckX8A0BEgk8MgkABIF2EmByhJK6AiMwCGjlGYIlCCwiQAICED4QEgBAMsIBiAMBDkGyCSQAI=
                   index: 1
                   status: done
+              responseMetadata:
+                nextCursor: LTE0Nzg0OTA3ODA5NDE2MDA0MTk
+
         404:
           description: No such project.
+        422:
+          description: Invalid parameters.
 
     delete:
       summary: If finished hashing, delete the clks. Otherwise, abandon hashing and delete the PII.
@@ -297,12 +323,14 @@ paths:
       operationId: clkhash_service.delete_clks
       responses:
         204:
-          description: Successfully deleted. Number of deleted items specified in the payload.
+          description: Successfully deleted. Number of deleted items specified in the payload. If there were no items within the range, this number will be 0.
           examples:
             application/json: 
               count: 2
         404:
           description: No such project.
+        422:
+          description: Invalid parameters.
 
 parameters:
   project_id:
