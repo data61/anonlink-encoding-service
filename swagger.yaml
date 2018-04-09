@@ -244,7 +244,7 @@ paths:
       operationId: clkhash_service.get_clks_status
       responses:
         200:
-          description: The status of each clk, by index. For convenience, adjacent clks with the same status are grouped together. The list is empty if there are not clks. The ranges are exclusive. Possible statuses are `queued` (awaiting processing), `in progress` (being processed now), `done` (ready for retrieval), `invalid data` (data did not pass validation against the schema), and `error` (internal error).
+          description: The status of each clk, by index. For convenience, adjacent clks with the same status are grouped together. The list is empty if there are not clks. The ranges are exclusive. Possible statuses are `queued` (awaiting processing), `in-progress` (being processed now), `done` (ready for retrieval), `invalid-data` (data did not pass validation against the schema), and `error` (internal error).
           examples:
             application/json:
               clks_status:
@@ -272,6 +272,12 @@ paths:
         required: false
         type: integer
         minimum: 0
+      - name: status
+        in: query
+        description: Comma-separated list. Permits filtering on status. Only clks with their status listed here will be returned.
+        required: false
+        type: string
+        minLength: 1
 
     get:
       summary: Retrieve the clks, if available.
@@ -302,7 +308,7 @@ paths:
                 - errMsg: Column `DOB YYYY/MM/DD` did not pass validation.
                   hash: null
                   index: 0
-                  status: invalid data
+                  status: invalid-data
                 - errMsg: null
                   hash: 2wRKwCio1SQDeAAEowBECdwNGkAJgChviDATAHTDRCgQECHqxiEARgl+iLQADIspmCB7gcFUgKGIwvCMBAirULh5kkDaiTlAJowckX8A0BEgk8MgkABIF2EmByhJK6AiMwCGjlGYIlCCwiQAICED4QEgBAMsIBiAMBDkGyCSQAI=
                   index: 1
