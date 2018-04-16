@@ -3,7 +3,10 @@ swagger: '2.0'
 info:
   title: Clkhash REST API
   version: 0.0.3
-  description: A simple REST wrapper around clkhash.
+  description: |
+    A simple REST wrapper around [clkhash](https://github.com/n1analytics/clkhash).
+
+    This API lets you upload personally identifying information (PII) for hashing, and to retrieve the hashes. It does not provide the option to download the raw PII.
 
   contact:
     name: N1 Analytics
@@ -14,10 +17,10 @@ schemes:
   - http
 
 tags:
-  - name: project
+  - name: projects
     description: A project is a namespace associated with a schema and keys. All uploaded data must belong to a project. Before uploading any private data, a project with some ID assigned by the user must be created.
 
-  - name: clk
+  - name: clks
     description: These methods operate on the data and the hashes, permitting us to upload private information, view progress of the hashing, retrieve the clks, and delete information.
 
 paths:
@@ -32,7 +35,7 @@ paths:
         - application/json
       responses:
         200:
-          description: List of linkage projects.
+          description: List of linkage projects. Every item in the list is a project ID.
           examples:
             application/json: {"projects": ["example-project", "another-project"]}
 
@@ -81,7 +84,7 @@ paths:
                   hashing:
                     ngram: 1
                     positional: true
-                - identifier:
+                - identifier: GENER M or F
                     format:
                       type: enum
                       values:
@@ -91,7 +94,7 @@ paths:
                       ngram: 1
                       weight: 2
         - name: project_id
-          in: path
+          in: query
           description: The ID of the linkage project. Must be unique.
           required: true
           type: string
@@ -108,11 +111,15 @@ paths:
           required: true
       responses:
         201:
-          description: Successfully created project.
+          description: Successfully created project. The response body is empty.
         409:
-          description: Project with this ID already exists.
+          description: Project with this ID already exists. The `"errmsg"` key contains the error message.
+          examples:
+            application/json: {"errMsg": "Project {} already exists."}
         422:
-          description: The parameters are not valid.
+          description: The parameters are not valid. The `"errmsg"` key contains the error message.
+          examples:
+            application/json: {"errMsg": "The schema does not conform to the master schema."}
 
   /projects/{project_id}:
     parameters:
@@ -172,7 +179,9 @@ paths:
                         ngram: 1
                         weight: 2
         404:
-          description: No such project.
+          description: No such project. The `"errMsg"` key contains the error message.
+          examples:
+            application/json: {"errMsg": "Project 'example-project' does not exist."}
 
     delete:
       summary: Delete the linkage project.
@@ -182,9 +191,11 @@ paths:
       operationId: clkhash_service.delete_project
       responses:
         204:
-          description: Successfully deleted.
+          description: Successfully deleted. The response body is empty.
         404:
-          description: No such project.
+          description: No such project. The `"errMsg"` key contains the error message.
+          examples:
+            application/json: {"errMsg": "Project 'example-project' already exists."}
 
   /projects/{project_id}/pii/:
     parameters:
@@ -222,15 +233,19 @@ paths:
           default: true
       responses:
         202:
-          description: Successfully sent for hashing.
+          description: Successfully sent for hashing. Returns the IDs of the post rows as a consecutive range. The range-end is inclusive.
           examples:
-            application/json: {'data_ids': [0, 1]}
+            application/json: {'dataIds': {'rangeStart': 0, 'rangeEnd': 1}}
 
         404:
-          description: No such project.
+          description: No such project. The `"errMsg"` key contains the error message.
+          examples:
+            application/json: {"errMsg": "Project 'example-project' does not exist."}
 
         422:
-          description: Invalid data. Details in payload.
+          description: Invalid data. The `"errMsg"` key contains the error message.
+          examples:
+            application/json: {"errMsg": "Invalid entry on line 21."}
 
   /projects/{project_id}/clks/status:
     parameters:
@@ -244,7 +259,7 @@ paths:
       operationId: clkhash_service.get_clks_status
       responses:
         200:
-          description: The status of each clk, by index. For convenience, adjacent clks with the same status are grouped together. The list is empty if there are not clks. The ranges are exclusive. Possible statuses are `queued` (awaiting processing), `in-progress` (being processed now), `done` (ready for retrieval), `invalid-data` (data did not pass validation against the schema), and `error` (internal error).
+          description: The status of each clk, by index. For convenience, adjacent clks with the same status are grouped together. The list is empty if there are not clks. Each list element contains `rangeStart`, the first index included; `rangeEnd`, the last index included; and a `status` string. Possible statuses are `queued` (awaiting processing), `in-progress` (being processed now), `done` (ready for retrieval), `invalid-data` (data did not pass validation against the schema), and `error` (internal error).
           examples:
             application/json:
               clks_status:
@@ -255,7 +270,9 @@ paths:
                   rangeEnd: 100003
                   status: queued
         404:
-          description: No such project.
+          description: No such project. The `"errMsg"` key contains the error message.
+          examples:
+            application/json: {"errMsg": "Project 'example-project' does not exist."}
 
   /projects/{project_id}/clks:
     parameters:
@@ -274,7 +291,7 @@ paths:
         minimum: 0
       - name: status
         in: query
-        description: Comma-separated list. Permits filtering on status. Only clks with their status listed here will be returned.
+        description: Comma-separated list. Permits filtering on status. Only clks with their status listed here will be returned. Permitted statuses are `queued`, `in-progress`, `done`, `invalid-data`, and `error`.
         required: false
         type: string
         minLength: 1
@@ -317,9 +334,13 @@ paths:
                 nextCursor: LTE0Nzg0OTA3ODA5NDE2MDA0MTk
 
         404:
-          description: No such project.
+          description: No such project. The `"errMsg"` key contains the error message.
+          examples:
+            application/json: {"errMsg": "Project 'example-project' does not exist."}
         422:
-          description: Invalid parameters.
+          description: Invalid parameters. The `"errMsg"` key contains the error message.
+          examples:
+            application/json: {"errMsg": "The provided cursor is invalid."}
 
     delete:
       summary: If finished hashing, delete the clks. Otherwise, abandon hashing and delete the PII.
@@ -334,9 +355,13 @@ paths:
             application/json: 
               count: 2
         404:
-          description: No such project.
+          description: No such project. The `"errMsg"` key contains the error message.
+          examples:
+            application/json: {"errMsg": "Project 'example-project' does not exist."}
         422:
-          description: Invalid parameters.
+          description: Invalid parameters. The `"errMsg"` key contains the error message.
+          examples:
+            application/json: {"errMsg": "Error in argument `status`: 'obviously-wrong-status' is not a valid status."}
 
 parameters:
   project_id:
