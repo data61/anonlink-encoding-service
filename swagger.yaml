@@ -34,7 +34,7 @@ paths:
       produces:
         - application/json
       responses:
-        200:
+        '200':
           description: List of linkage projects. Every item in the list is a project ID.
           examples:
             application/json: {"projects": ["example-project", "another-project"]}
@@ -49,6 +49,7 @@ paths:
         - application/json
       parameters:
         - name: schema
+          description: Controls the way the hashing is performed and the format of the fields. This must be consistent between the parties whose data is being linked. See documentation at http://clkhash.readthedocs.io/en/latest/schema.html.
           in: body
           required: true
           schema:
@@ -84,7 +85,7 @@ paths:
                   hashing:
                     ngram: 1
                     positional: true
-                - identifier: GENER M or F
+                - identifier: GENDER M or F
                     format:
                       type: enum
                       values:
@@ -110,13 +111,13 @@ paths:
           type: string
           required: true
       responses:
-        201:
+        '201':
           description: Successfully created project. The response body is empty.
-        409:
+        '409':
           description: Project with this ID already exists. The `"errmsg"` key contains the error message.
           examples:
             application/json: {"errMsg": "Project {} already exists."}
-        422:
+        '422':
           description: The parameters are not valid. The `"errmsg"` key contains the error message.
           examples:
             application/json: {"errMsg": "The schema does not conform to the master schema."}
@@ -132,7 +133,7 @@ paths:
         - projects
       operationId: clkhash_service.get_project
       responses:
-        200:
+        '200':
           description: Properties of specified object.
           examples:
             application/json:
@@ -178,7 +179,7 @@ paths:
                       hashing:
                         ngram: 1
                         weight: 2
-        404:
+        '404':
           description: No such project. The `"errMsg"` key contains the error message.
           examples:
             application/json: {"errMsg": "Project 'example-project' does not exist."}
@@ -190,9 +191,9 @@ paths:
         - projects
       operationId: clkhash_service.delete_project
       responses:
-        204:
+        '204':
           description: Successfully deleted. The response body is empty.
-        404:
+        '404':
           description: No such project. The `"errMsg"` key contains the error message.
           examples:
             application/json: {"errMsg": "Project 'example-project' already exists."}
@@ -232,17 +233,17 @@ paths:
           required: false
           default: true
       responses:
-        202:
+        '202':
           description: Successfully sent for hashing. Returns the IDs of the post rows as a consecutive range. The range-end is inclusive.
           examples:
             application/json: {'dataIds': {'rangeStart': 0, 'rangeEnd': 1}}
 
-        404:
+        '404':
           description: No such project. The `"errMsg"` key contains the error message.
           examples:
             application/json: {"errMsg": "Project 'example-project' does not exist."}
 
-        422:
+        '422':
           description: Invalid data. The `"errMsg"` key contains the error message.
           examples:
             application/json: {"errMsg": "Invalid entry on line 21."}
@@ -258,7 +259,7 @@ paths:
         - clks
       operationId: clkhash_service.get_clks_status
       responses:
-        200:
+        '200':
           description: The status of each clk, by index. For convenience, adjacent clks with the same status are grouped together. The list is empty if there are not clks. Each list element contains `rangeStart`, the first index included; `rangeEnd`, the last index included; and a `status` string. Possible statuses are `queued` (awaiting processing), `in-progress` (being processed now), `done` (ready for retrieval), `invalid-data` (data did not pass validation against the schema), and `error` (internal error).
           examples:
             application/json:
@@ -269,7 +270,7 @@ paths:
                 - rangeStart: 16002
                   rangeEnd: 100003
                   status: queued
-        404:
+        '404':
           description: No such project. The `"errMsg"` key contains the error message.
           examples:
             application/json: {"errMsg": "Project 'example-project' does not exist."}
@@ -316,7 +317,7 @@ paths:
           minLength: 1
       operationId: clkhash_service.get_clks
       responses:
-        200:
+        '200':
           description: The clks are returned along with their status. The hash is `null` where it has not been computed. The list is empty if there are no clks with IDs in the specified range. A `responseMetadata` object is returned. It contains a `nextCursor` string which must be passed in the next request to retrieve the next page; it is URL-safe, so no URL encoding is required. The `nextCursor` is `null` if no next page is available.
           examples:
             application/json: 
@@ -333,11 +334,11 @@ paths:
               responseMetadata:
                 nextCursor: LTE0Nzg0OTA3ODA5NDE2MDA0MTk
 
-        404:
+        '404':
           description: No such project. The `"errMsg"` key contains the error message.
           examples:
             application/json: {"errMsg": "Project 'example-project' does not exist."}
-        422:
+        '422':
           description: Invalid parameters. The `"errMsg"` key contains the error message.
           examples:
             application/json: {"errMsg": "The provided cursor is invalid."}
@@ -349,16 +350,16 @@ paths:
         - clks
       operationId: clkhash_service.delete_clks
       responses:
-        204:
+        '204':
           description: Successfully deleted. Number of deleted items specified in the payload. If there were no items within the range, this number will be 0.
           examples:
             application/json: 
               count: 2
-        404:
+        '404':
           description: No such project. The `"errMsg"` key contains the error message.
           examples:
             application/json: {"errMsg": "Project 'example-project' does not exist."}
-        422:
+        '422':
           description: Invalid parameters. The `"errMsg"` key contains the error message.
           examples:
             application/json: {"errMsg": "Error in argument `status`: 'obviously-wrong-status' is not a valid status."}
