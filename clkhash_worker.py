@@ -10,9 +10,9 @@ from database import (Clk, ClkStatus, db_session, Project)
 
 
 try:
-    _BROKER_URI = os.environ['CLK_SERVICE_BROKER_URI']
+    _BROKER_URI = os.environ['CLKHASH_SERVICE_BROKER_URI']
 except KeyError as _e:
-    _msg = 'Unset environment variable CLK_SERVICE_BROKER_URI.'
+    _msg = 'Unset environment variable CLKHASH_SERVICE_BROKER_URI.'
     raise KeyError(_msg) from _e
 
 
@@ -33,6 +33,7 @@ def hash(project_id, validate, start_index, count):
             return
 
         schema = Schema.from_json_dict(project.schema)
+        # TODO: cache derived keys in the database
         key_lists = clkhash.key_derivation.generate_key_lists(
             project.keys,
             len(schema.fields),
@@ -44,26 +45,26 @@ def hash(project_id, validate, start_index, count):
 
         tokenizers = [clkhash.tokenizer.get_tokenizer(field.hashing_properties)
               for field in schema.fields]
-        field_hashing = [field.hashing_properties for field in schema.fields]
         hash_properties = schema.hashing_globals
 
         clks = db_session.query(Clk).filter(
-                Clk.project_id == project_id,
-                Clk.index >= start_index,
-                Clk.index < start_index + count
-            )
+            Clk.project_id == project_id,
+            Clk.index >= start_index,
+            Clk.index < start_index + count)
+        # TODO: Mark as in progress
 
         for c in clks:
             # TODO: Validate
             bf, _, _ = clkhash.bloomfilter.crypto_bloom_filter(
-                c.pii, tokenizers, field_hashing, key_lists, hash_properties)
+                c.pii, tokenizers, schema.fields, key_lists, hash_properties)
             c.hash = bf.tobytes()
             c.pii = None
-            c.status = ClkStatus.CLK_DONE
+            c.status = ClkStatus.DONE
         
         try:
             db_session.flush()
         except sqlalchemy.orm.exc.StaleDataError:
+            # TODO: Do not roll all changes back. Only ignore deleted clks.
             # These clks were deleted.
             db_session.rollback()
         else:
@@ -77,7 +78,7 @@ def hash(project_id, validate, start_index, count):
             ).update({
                 Clk.hash: None,
                 Clk.pii: None,
-                Clk.status: ClkStatus.CLK_ERROR,
+                Clk.status: ClkStatus.ERROR,
                 Clk.err_msg: str(e)
             })
         db_session.flush()

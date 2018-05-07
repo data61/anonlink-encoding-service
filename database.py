@@ -9,9 +9,9 @@ from sqlalchemy.ext.declarative import declarative_base
 
 
 try:
-    _DB_URI = os.environ['CLK_SERVICE_DB_URI']
+    _DB_URI = os.environ['CLKHASH_SERVICE_DB_URI']
 except KeyError as _e:
-    _msg = 'Unset environment variable CLK_SERVICE_DB_URI.'
+    _msg = 'Unset environment variable CLKHASH_SERVICE_DB_URI.'
     raise KeyError(_msg) from _e
 
 
@@ -23,11 +23,11 @@ Base = declarative_base()
 
 
 class ClkStatus(enum.Enum):
-    CLK_QUEUED = 'queued'
-    CLK_IN_PROGRESS = 'in progress'
-    CLK_DONE = 'done'
-    CLK_INVALID_DATA = 'invalid data'
-    CLK_ERROR = 'error'
+    QUEUED = 'queued'
+    IN_PROGRESS = 'in progress'
+    DONE = 'done'
+    INVALID_DATA = 'invalid-data'
+    ERROR = 'error'
 
 
 class Project(Base):
