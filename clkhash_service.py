@@ -2,16 +2,19 @@ import base64
 import csv
 import functools
 import io
+import itertools
+import json
 import os
 import urllib.parse
 
-from flask import abort, Response
 import clkhash
+import clkhash.validate_data
 import connexion
 import sqlalchemy
 import sqlalchemy.exc
 import sqlalchemy.orm
 import sqlalchemy.sql
+from flask import abort, jsonify, Response, request
 
 import clkhash_worker
 from database import Clk, db_session, ClkStatus, Project
@@ -29,30 +32,27 @@ _DELETE_SUCCESS_RESPONSE = Response(status=204)
 del _DELETE_SUCCESS_RESPONSE.headers['Content-Type']
 
 
-def _apply(function, *iterables):
-    """Apply function and discard result."""
-    for args in zip(*iterables):
-        function(*args)
-
-
-# TODO: make this return JSON
 def _abort_with_msg(msg, status):
-    abort(Response(response=msg,
-                   status=status,
-                   content_type='text/plain'))
+    """Abort with specified message and status code."""
+    response = jsonify(errMsg=msg)
+    response.status_code = status
+    abort(response)
 
 
 def _abort_project_id_not_found(project_id):
-    _abort_with_msg("No such project '{}'.".format(project_id), 404)
+    """Abort with message that the project was not found."""
+    _abort_with_msg("no such project '{}'".format(project_id), 404)
 
 
 def _does_project_exist(project_id):
+    """Returns True iff project with ID `project_id` exists."""
     return db_session.query(
             sqlalchemy.sql.exists().where(Project.id == project_id)
         ).scalar()
 
 
 def _str_to_status_or_abort(status_str):
+    """Convert string to ClkStatus; abort if input is unrecognised."""
     try:
         status_enum = ClkStatus(status_str)
     except ValueError:
@@ -69,6 +69,14 @@ def _abort_if_project_not_found(function):
             return function(project_id, *args, **kwargs)
 
     return retval
+
+
+def _intersperse(iterable, item):
+    iterator = iter(iterable)  # Remember where we left off
+    yield next(iterator)  # Exit StopIteration if empty
+    for i in iterator:
+        yield item
+        yield i
 
 
 def _query_statuses_to_enum_or_abort(query_statuses):
@@ -158,7 +166,6 @@ def delete_project(project_id):
         _abort_project_id_not_found(project_id)
     elif delete_count == 1:
         # Delete clks also.
-        # TODO: abort Celery jobs
         db_session.query(Clk).filter(Clk.project_id == project_id).delete()
         db_session.commit()
 
@@ -170,6 +177,36 @@ def delete_project(project_id):
             .format(delete_count))
 
 
+def _first_last(iterable):
+    iterator = iter(iterable)
+    try:
+        first = last = next(iterator)
+    except StopIteration:
+        raise ValueError('empty iterable')
+
+    for last in iterator:
+        pass
+
+    return first, last
+
+
+def _group_clks(clks):
+    for _, group in itertools.groupby(
+            enumerate(clks),
+            key=lambda x: (x[1].status,          # Group by status and
+                           x[1].index - x[0])):  # by offset from start.
+        (_, first_clk), (_, last_clk) = _first_last(group)
+        yield {'status': first_clk.status.value,
+               'rangeStart': first_clk.index,
+               'rangeEnd': last_clk.index + 1}
+
+
+def _stream_clk_groups(clk_groups):
+    yield '{"clksStatus":['
+    yield from _intersperse(map(json.dumps, clk_groups), ',')
+    yield ']}'
+
+
 @_abort_if_project_not_found
 def get_clks_status(project_id):
     clks = db_session.query(Clk).filter(
@@ -178,48 +215,40 @@ def get_clks_status(project_id):
             sqlalchemy.orm.load_only(Clk.index, Clk.status)
         ).order_by(Clk.index)
 
-    clks_iter = iter(clks)  # Resume iteration from where we stopped.
-    try:
-        group_start = next(clks_iter)
-    except StopIteration:
-        # No clks.
-        return {'clksStatus': []}
-
-    # TODO: use itertools.groupby
-    groups = []
-    count = 1
-    for clk in clks_iter:
-        if (clk.index == group_start.index + count
-                and clk.status == group_start.status):
-            count += 1
-        else:
-            groups.append(dict(
-                status=group_start.status.value,
-                rangeStart=group_start.index,
-                rangeEnd=group_start.index + count))
-            group_start = clk
-            count = 1
-    groups.append(dict(
-        status=group_start.status.value,
-        rangeStart=group_start.index,
-        rangeEnd=group_start.index + count))
-
-    return {'clksStatus': groups}
+    clk_groups = _group_clks(clks)
+    clk_group_stream = _stream_clk_groups(clk_groups)
+    return Response(clk_group_stream, content_type='application/json')
 
 
 @_abort_if_project_not_found
 def post_pii(project_id, pii_table, header, validate):
-    # TODO: default encoding is actually ISO/IEC 8859-1. Pemit specifying UTF-8 in header.
-    pii_table = pii_table.decode('utf-8')
+    pii_table = pii_table.decode(request.charset)
     pii_table_stream = io.StringIO(pii_table)
 
     reader = csv.reader(pii_table_stream)
-    if header:
+    if header != 'false':
         try:
             headings = next(reader)
-            # TODO: validate headers
         except StopIteration:
             _abort_with_msg('Header expected but not present.', 422)
+        
+        if header == 'true':
+            project = db_session.query(Project).options(
+                sqlalchemy.orm.load_only(Project.schema)
+            ).filter(
+                Project.id == project_id
+            ).one_or_none()
+
+            if project is None:
+                # Project deleted in the meantime
+                _abort_project_id_not_found(project_id)
+
+            schema = clkhash.schema.Schema.from_json_dict(project.schema)
+            try:
+                clkhash.validate_data.validate_header(schema.fields, headings)
+            except clkhash.validate_data.FormatError as e:
+                msg, *_ = e.args
+                _abort_with_msg(msg, 422)
 
     pii_table = tuple(reader)
     records_num = len(pii_table)
@@ -232,31 +261,23 @@ def post_pii(project_id, pii_table, header, validate):
         ).returning(Project.clk_count)
     result = db_session.execute(stmt)
     db_session.commit()
-    start_index = result.scalar() - records_num
-
-    if start_index is None:
+    
+    result_scalar = result.scalar()
+    if result_scalar is None:
+        # Project deleted in the meantime
         _abort_project_id_not_found(project_id)
 
-    # Add PII to db.
-    # TODO: Benchmark this and optimise if necessary.
-    for i, row in enumerate(pii_table, start=start_index):
-        clk = Clk(
-                project_id=project_id,
-                index=i,
-                status=ClkStatus.QUEUED,
-                pii=row
-            )
-        db_session.add(clk)
-
+    start_index = result_scalar - records_num
+    clk_mappings = [
+        dict(project_id=project_id, index=i, status=ClkStatus.QUEUED, pii=row)
+        for i, row in enumerate(pii_table, start=start_index)]
     try:
-        db_session.flush()
+        db_session.bulk_insert_mappings(Clk, clk_mappings)
     except sqlalchemy.exc.IntegrityError:
         # Project deleted in the meantime. All good, we'll just abort.
-        db_session.rollback()
         _abort_project_id_not_found(project_id)
 
     # Queue up for the worker.
-    # TODO: merge jobs from multiple calls?
     end_index = start_index + records_num
     clk_indices = range(start_index, end_index)
     for i in range(0, clk_indices.stop - clk_indices.start, CHUNK_SIZE):
@@ -264,7 +285,7 @@ def post_pii(project_id, pii_table, header, validate):
         clkhash_worker.hash.delay(project_id,
                                   validate,
                                   this_indices.start,
-                                  this_indices.stop - this_indices.start)
+                                  this_indices.stop)
 
     # Only commit once we know that the queueing succeeded.
     db_session.commit()
@@ -275,6 +296,51 @@ def post_pii(project_id, pii_table, header, validate):
                 'rangeEnd': end_index
             }
         }, 202
+
+
+def _clk_to_dict(clk):
+    return {
+        'index': clk.index,
+        'status': clk.status.value,
+        'errMsg': clk.err_msg,
+        'hash': base64.b64encode(clk.hash).decode('ascii')
+                if clk.hash is not None
+                else None
+    }
+
+
+def _stream_clks(clks, page_limit):
+    clk_iter = iter(clks)  # Remember where we left off
+    returned_clks = (clk_iter
+                     if page_limit is None
+                     else itertools.islice(clk_iter, page_limit))
+    yield '{"clks":['
+    
+    # First clk is a special case since we need to intersperse ","
+    try:
+        clk = next(returned_clks)
+    except StopIteration:
+        pass
+    else:
+        last_index = clk.index
+        yield json.dumps(_clk_to_dict(clk))
+    
+    for clk in returned_clks:
+        yield ','
+        last_index = clk.index
+        yield json.dumps(_clk_to_dict(clk))
+
+    yield '],"responseMetadata":'
+
+    try:  # See if there are clks we haven't returned
+        next(clk_iter)
+    except StopIteration:
+        cursor = None
+    else:
+        cursor = str(last_index)
+
+    yield json.dumps({'nextCursor': cursor})
+    yield '}'
 
 
 @_abort_if_project_not_found
@@ -299,7 +365,7 @@ def get_clks(project_id,
                 and index_range_end <= last_returned_index)):
             # Impossible that the cursor comes from the last call.
             _abort_with_msg('the cursor does not match the request', 422)
-        
+
         index_range_start = last_returned_index + 1
 
     status_enums = _query_statuses_to_enum_or_abort(status)
@@ -309,39 +375,16 @@ def get_clks(project_id,
     query = query.order_by(Clk.index)
 
     if page_limit is not None:
-        # Already ordered. # Limit by `page_limit + 1` so we can check
+        # Already ordered. Limit by `page_limit + 1` so we can check
         # if there are leftover elements.
         query = query.limit(page_limit + 1)
-    
-    # TODO: What happens if this can't fit in memory? Needs handling.
+
     clks = query.options(
             sqlalchemy.orm.load_only(
-                Clk.index, Clk.status, Clk.err_msg, Clk.hash)).all()
-    assert page_limit is None or 0 <= len(clks) <= page_limit + 1
+                Clk.index, Clk.status, Clk.err_msg, Clk.hash))
 
-    if page_limit is not None and len(clks) > page_limit:
-        assert 1 <= page_limit  # Guaranteed by Swagger spec.
-        assert len(clks) >= 2  # Follows from above.
-        clks = clks[:-1]  # Last row is just to check for termination
-        cursor = str(clks[-1].index)
-    else:
-        cursor = None
-
-    # TODO: stream: https://blog.al4.co.nz/2016/01/streaming-json-with-flask/
-    return {
-        'clks': [{
-            'index': c.index,
-            'status': c.status.value,
-            'errMsg': c.err_msg,
-            'hash': base64.b64encode(c.hash).decode('ascii')
-                    if c.hash is not None
-                    else None
-        } for c in clks],
-        'responseMetadata': {
-            'nextCursor': cursor
-        }
-    }
-
+    return Response(_stream_clks(clks, page_limit),
+                    content_type='application/json')
 
 
 @_abort_if_project_not_found

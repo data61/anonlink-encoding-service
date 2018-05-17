@@ -24,7 +24,7 @@ Base = declarative_base()
 
 class ClkStatus(enum.Enum):
     QUEUED = 'queued'
-    IN_PROGRESS = 'in progress'
+    IN_PROGRESS = 'in-progress'
     DONE = 'done'
     INVALID_DATA = 'invalid-data'
     ERROR = 'error'
@@ -46,7 +46,7 @@ class Clk(Base):
     index = Column(Integer, primary_key=True)
     status = Column(Enum(ClkStatus), nullable=False)
     err_msg = Column(String)
-    pii = Column(JSON)  #  TODO: make own table if having scale issues?
+    pii = Column(JSON)  # Future: make own table if having scale issues?
     hash = Column(LargeBinary)
 
 
