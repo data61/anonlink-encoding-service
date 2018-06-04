@@ -86,25 +86,19 @@ paths:
                     ngram: 1
                     positional: true
                 - identifier: GENDER M or F
-                    format:
-                      type: enum
-                      values:
-                        - M
-                        - F
-                    hashing:
-                      ngram: 1
-                      weight: 2
+                  format:
+                    type: enum
+                    values:
+                      - M
+                      - F
+                  hashing:
+                    ngram: 1
+                    weight: 2
         - name: project_id
           in: query
           description: The ID of the linkage project. Must be unique.
           required: true
           type: string
-        - name: validate
-          description: 'If `true`, validate the PII before hashing.'
-          in: query
-          type: boolean
-          required: false
-          default: true
         - name: keys
           description: Comma-separated keys. Each key is a base64 string. These need to be URL-encoded since base64 is not URL-safe by default.
           in: query
@@ -114,11 +108,11 @@ paths:
         '201':
           description: Successfully created project. The response body is empty.
         '409':
-          description: Project with this ID already exists. The `"errmsg"` key contains the error message.
+          description: Project with this ID already exists. The `"errMsg"` key contains the error message.
           examples:
-            application/json: {"errMsg": "Project {} already exists."}
+            application/json: {"errMsg": "Project 'example_project' already exists."}
         '422':
-          description: The parameters are not valid. The `"errmsg"` key contains the error message.
+          description: The parameters are not valid. The `"errMsg"` key contains the error message.
           examples:
             application/json: {"errMsg": "The schema does not conform to the master schema."}
 
@@ -196,7 +190,7 @@ paths:
         '404':
           description: No such project. The `"errMsg"` key contains the error message.
           examples:
-            application/json: {"errMsg": "Project 'example-project' already exists."}
+            application/json: {"errMsg": "Project 'example-project' does not exist."}
 
   /projects/{project_id}/pii/:
     parameters:
@@ -221,11 +215,12 @@ paths:
               Jane Doe,1968/05/19,F
               Peter Griffin,1998/12/20,M
         - name: header
-          description: 'Set to `true` if the csv input has a header row.'
+          description: "Default 'true': the CSV input has a header row and we wish to validate the column names against the schema. Set to 'ignore' to skip the header row. Set to 'false' if the table does not have a header row."
           in: query
-          type: boolean
+          type: string
+          enum: ['false', 'ignore', 'true']
           required: false
-          default: false
+          default: 'true'
         - name: validate
           description: 'If `true`, validate the PII before hashing.'
           in: query
@@ -263,7 +258,7 @@ paths:
           description: The status of each clk, by index. For convenience, adjacent clks with the same status are grouped together. The list is empty if there are not clks. Each list element contains `rangeStart`, the first index included; `rangeEnd`, the last index included; and a `status` string. Possible statuses are `queued` (awaiting processing), `in-progress` (being processed now), `done` (ready for retrieval), `invalid-data` (data did not pass validation against the schema), and `error` (internal error).
           examples:
             application/json:
-              clks_status:
+              clksStatus:
                 - rangeStart: 0
                   rangeEnd: 16003
                   status: done
@@ -275,7 +270,7 @@ paths:
           examples:
             application/json: {"errMsg": "Project 'example-project' does not exist."}
 
-  /projects/{project_id}/clks:
+  /projects/{project_id}/clks/:
     parameters:
       - $ref: '#/parameters/project_id'
       - name: index_range_start
@@ -286,7 +281,7 @@ paths:
         minimum: 0
       - name: index_range_end
         in: query
-        description: The index of the last clk to operate on.
+        description: The index of the last clk to operate on, plus one.
         required: false
         type: integer
         minimum: 0
