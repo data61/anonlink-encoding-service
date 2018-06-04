@@ -22,7 +22,30 @@ logger = celery.utils.log.get_task_logger(__name__)
 logger.info("Setting up celery worker...")
 
 
+def _get_mapping_for_hash(project_id, key_lists,
+                          schema, tokenizers, hash_properties,
+                          validate,
+                          r):
+    try:
+        if validate:
+            clkhash.validate_data.validate_entries(schema.fields,
+                                                   [r.pii])
+    except (clkhash.validate_data.EntryError,
+            clkhash.validate_data.FormatError) as e:
+        msg, *_ = e.args
+        mapping = dict(
+            project_id=project_id, index=r.index,
+            err_msg=msg, pii=None, status=ClkStatus.INVALID_DATA)
+    else:
+        bf, _, _ = clkhash.bloomfilter.crypto_bloom_filter(
+            r.pii, tokenizers, schema.fields,
+            key_lists, hash_properties)
 
+        mapping = dict(
+            project_id=project_id, index=r.index,
+            hash=bf.tobytes(), pii=None, status=ClkStatus.DONE)
+
+    return mapping
 
 
 @app.task
@@ -30,7 +53,7 @@ def hash(project_id, validate, start_index, end_index):
     try:
         logger.info('{}-{}: Starting.'.format(start_index, end_index))
         # Mark clks as in process
-        clks = db_session.query(Clk).filter(
+        db_session.query(Clk).filter(
                 Clk.project_id == project_id,
                 Clk.index >= start_index,
                 Clk.index < end_index
@@ -66,39 +89,25 @@ def hash(project_id, validate, start_index, end_index):
               for field in schema.fields]
         hash_properties = schema.hashing_globals
 
-        clks = db_session.query(Clk).filter(
+        records = db_session.query(Clk).filter(
             Clk.project_id == project_id,
             Clk.index >= start_index,
             Clk.index < end_index)
 
         mappings = []
-        for c in clks:
+        for r in records:
             # Big try/except block, so we can resume hashing on other
             # Clks even if we error.
             mapping = None
             try:
-                try:
-                    if validate:
-                        clkhash.validate_data.validate_entries(schema.fields,
-                                                               [c.pii])
-                except (clkhash.validate_data.EntryError,
-                        clkhash.validate_data.FormatError) as e:
-                    msg, *_ = e.args
-                    mapping = dict(
-                        project_id=project_id, index=c.index,
-                        err_msg=msg, pii=None, status=ClkStatus.INVALID_DATA)
-                else:
-                    bf, _, _ = clkhash.bloomfilter.crypto_bloom_filter(
-                        c.pii, tokenizers, schema.fields,
-                        key_lists, hash_properties)
-
-                    mapping = dict(
-                        project_id=project_id, index=c.index,
-                        hash=bf.tobytes(), pii=None, status=ClkStatus.DONE)
+                mapping = _get_mapping_for_hash(
+                    project_id, key_lists, schema, tokenizers, hash_properties,
+                    validate,
+                    r)
             except Exception as e:
                 logger.warning('Exception while hashing: {}'.format(e))
                 mapping = dict(
-                    project_id=project_id, index=c.index,
+                    project_id=project_id, index=r.index,
                     err_msg=str(e), status=ClkStatus.ERROR, pii=None)
 
             assert mapping is not None
@@ -109,7 +118,7 @@ def hash(project_id, validate, start_index, end_index):
 
     except BaseException as e:
         logger.error('Fatal error: {}'.format(e))
-        clks = db_session.query(Clk).filter(
+        db_session.query(Clk).filter(
                 Clk.project_id == project_id,
                 Clk.index >= start_index,
                 Clk.index < end_index

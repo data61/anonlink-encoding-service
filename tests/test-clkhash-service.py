@@ -1,3 +1,4 @@
+import base64
 import os
 import time
 import unittest
@@ -7,7 +8,7 @@ import requests
 PREFIX = os.environ['CLKHASH_SERVICE_PREFIX']
 
 PROJECT_ID = 'test-data'
-KEY1, KEY2 = 'correct', 'horse'
+KEYS = b'correct', b'horse'
 SCHEMA = {
     'version': 1,
     'clkConfig': {
@@ -78,7 +79,7 @@ class TestProjects(unittest.TestCase):
         r = requests.get(PREFIX + '/projects')
         self.assertEqual(r.status_code, 200,
                          msg='Expected GET /projects to succeed.')
-        self.assertEqual(r.json(), {'projects': []},
+        self.assertNotIn(PROJECT_ID, r.json()['projects'],
                          msg='Unexpected output from GET /projects.')
 
         r = requests.get(PREFIX + '/projects/{}'.format(PROJECT_ID))
@@ -93,11 +94,11 @@ class TestProjects(unittest.TestCase):
 
         # Try making the project with an invalid schema.
         r = requests.post(
-            PREFIX + '/projects/{project_id}'.format(
+            PREFIX + '/projects/'.format(
                 project_id=PROJECT_ID),
             params=dict(
-                key1=KEY1,
-                key2=KEY2),
+                project_id=PROJECT_ID,
+                keys=b','.join(map(base64.b64encode, KEYS))),
             json=["Oh no this won't work."])
         self.assertEqual(
             r.status_code, 422,
@@ -106,11 +107,11 @@ class TestProjects(unittest.TestCase):
 
         # Actually make the project.
         r = requests.post(
-            PREFIX + '/projects/{project_id}'.format(
+            PREFIX + '/projects/'.format(
                 project_id=PROJECT_ID),
             params=dict(
-                key1=KEY1,
-                key2=KEY2),
+                project_id=PROJECT_ID,
+                keys=b','.join(map(base64.b64encode, KEYS))),
             json=SCHEMA)
         self.assertEqual(
             r.status_code, 201,
@@ -119,11 +120,11 @@ class TestProjects(unittest.TestCase):
         
         # This should fail as the `project_id` already exists.
         r = requests.post(
-            PREFIX + '/projects/{project_id}'.format(
+            PREFIX + '/projects/'.format(
                 project_id=PROJECT_ID),
             params=dict(
-                key1=KEY1,
-                key2=KEY2),
+                project_id=PROJECT_ID,
+                keys=b','.join(map(base64.b64encode, KEYS))),
             json=SCHEMA)
         self.assertEqual(
             r.status_code, 409,
@@ -142,13 +143,13 @@ class TestProjects(unittest.TestCase):
             r.status_code, 200,
             msg='Expected GET /projects/{} to succeed.'.format(PROJECT_ID))
         self.assertEqual(
-            r.json(), {'project_id': PROJECT_ID, 'schema': SCHEMA},
+            r.json(), {'projectId': PROJECT_ID, 'schema': SCHEMA},
             msg='Unexpected output from GET /project/{}.'.format(PROJECT_ID))
 
         # Delete the project
         r = requests.delete(PREFIX + '/projects/{}'.format(PROJECT_ID))
-        self.assertIn(
-            r.status_code, {202, 204},
+        self.assertEqual(
+            r.status_code, 204,
             msg='Expected DELETE /projects/{} to succeed.'.format(PROJECT_ID))
 
         # Check if it's actually been deleted.
@@ -180,93 +181,93 @@ class TestClks(unittest.TestCase):
     def test_projects(self):
         # At this stage the project doesn't exist, so we cannot get its
         # clks.
-        r = requests.get(PREFIX + '/projects/{}/clks'.format(PROJECT_ID))
+        r = requests.get(PREFIX + '/projects/{}/clks/status'.format(
+            PROJECT_ID))
         self.assertEqual(
             r.status_code, 404,
             msg='Expected GET /projects/{}/clks to fail.'.format(PROJECT_ID))
 
-        r = requests.get(PREFIX + '/projects/{}/clks/0/2'.format(PROJECT_ID))
+        r = requests.get(PREFIX + '/projects/{}/clks/'.format(PROJECT_ID),
+            params=dict(index_range_start=0,
+                        index_range_end=2))
         self.assertEqual(
             r.status_code, 404,
-            msg='Expected GET /projects/{}/clks/0/2 to fail.'.format(
-                PROJECT_ID))
+            msg='Expected GET /projects/{}/clks/ to fail.'.format(PROJECT_ID))
 
         r = requests.delete(
-            PREFIX + '/projects/{}/clks/0/2'.format(PROJECT_ID))
+            PREFIX + '/projects/{}/clks/'.format(PROJECT_ID),
+            params=dict(index_range_start=0,
+                        index_range_end=2))
         self.assertEqual(
             r.status_code, 404,
-            msg='Expected DELETE /projects/{}/clks/0/2 to fail.'.format(
+            msg='Expected DELETE /projects/{}/clks/ to fail.'.format(
                 PROJECT_ID))
 
         # Make the project.
         r = requests.post(
-            PREFIX + '/projects/{project_id}'.format(
-                project_id=PROJECT_ID),
+            PREFIX + '/projects/',
             params=dict(
-                key1=KEY1,
-                key2=KEY2),
+                project_id=PROJECT_ID,
+                keys=b','.join(map(base64.b64encode, KEYS))),
             json=SCHEMA)
         self.assertEqual(
             r.status_code, 201,
-            msg='Expected POST /projects/{} to succeed.'.format(
-                PROJECT_ID))
+            msg='Expected POST /projects/ to succeed.')
 
         # There are no clks so the status will be empty.
-        r = requests.get(
-            PREFIX + '/projects/{project_id}/clks'.format(
-                project_id=PROJECT_ID))
+        r = requests.get(PREFIX + '/projects/{}/clks/status'.format(
+            PROJECT_ID))
         self.assertEqual(
             r.status_code, 200,
-            msg='Expected GET /projects/{}/clks to succeed.'.format(
+            msg='Expected GET /projects/{}/clks/status to succeed.'.format(
                 PROJECT_ID))
         self.assertEqual(
-            r.json(), {'clks_status': []},
-            msg='Unexpected output from GET /projects/{}/clks'.format(
+            r.json(), {'clksStatus': []},
+            msg='Unexpected output from GET /projects/{}/clks/status'.format(
                 PROJECT_ID))
 
         # These clks don't exist so we'll get an empty list when we
         # access them.
         r = requests.get(
-            PREFIX + '/projects/{project_id}/clks/0/2'.format(
-                project_id=PROJECT_ID))
+            PREFIX + '/projects/{}/clks/'.format(PROJECT_ID),
+            params=dict(index_range_start=0,
+                        index_range_end=2))
         self.assertEqual(
             r.status_code, 200,
-            msg='Expected GET /projects/{}/clks/0/2 to succeed.'.format(
+            msg='Expected GET /projects/{}/clks/ to succeed.'.format(
                 PROJECT_ID))
         self.assertEqual(
-            r.json(), {'clks': []},
-            msg='Unexpected output from GET /projects/{}/clks/0/2'.format(
+            r.json(), {'clks': [], 'responseMetadata': {'nextCursor': None}},
+            msg='Unexpected output from GET /projects/{}/clks/'.format(
                 PROJECT_ID))
 
         # Post clks.
         r = requests.post(
-            PREFIX + '/projects/{project_id}/clks/'.format(
-                project_id=PROJECT_ID),
+            PREFIX + '/projects/{}/pii/'.format(PROJECT_ID),
             params=dict(
-                header=True),
+                header='true'),
             data='NAME freetext,DOB YYYY/MM/DD,GENDER M or F\n'
                  'Jane Doe,1968/05/19,F\n'
                  'Peter Griffin,1998/12/20,M\n')
         self.assertEqual(
             r.status_code, 202,
-            msg='Expected POST /projects/{}/clks to succeed.'.format(
+            msg='Expected POST /projects/{}/pii/ to succeed.'.format(
                 PROJECT_ID))
         self.assertEqual(
-            r.json(), {'clk_number': 2, 'clk_start_index': 0},
-            msg='Unexpected output from POST /projects/{}/clks'.format(
+            r.json(), {'dataIds': {'rangeStart': 0, 'rangeEnd': 2}},
+            msg='Unexpected output from POST /projects/{}/pii/'.format(
                 PROJECT_ID))
 
         # The status should be nonempty.
         r = requests.get(
-            PREFIX + '/projects/{project_id}/clks'.format(
-                project_id=PROJECT_ID))
+            PREFIX + '/projects/{}/clks/status'.format(PROJECT_ID))
         self.assertEqual(
             r.status_code, 200,
-            msg='Expected GET /projects/{}/clks to succeed.'.format(
+            msg='Expected GET /projects/{}/clks/status to succeed.'.format(
                 PROJECT_ID))
         self.assertIn(
-            len(r.json()['clks_status']), {1, 2},
-            msg='Unexpected output from GET /projects/{}/clks'.format(
+            len(r.json()['clksStatus']), {1, 2},
+            msg='Unexpected output from GET /projects/{}/clks/status'.format(
                 PROJECT_ID))
 
         # Wait a second for clks to get processed
@@ -274,69 +275,76 @@ class TestClks(unittest.TestCase):
 
         # We can get these clks.
         r = requests.get(
-            PREFIX + '/projects/{project_id}/clks/0/2'.format(
-                project_id=PROJECT_ID))
+            PREFIX + '/projects/{}/clks/'.format(PROJECT_ID),
+            params=dict(index_range_start=0,
+                        index_range_end=2))
         self.assertEqual(
             r.status_code, 200,
-            msg='Expected GET /projects/{}/clks/0/2 to succeed.'.format(
+            msg='Expected GET /projects/{}/clks/ to succeed.'.format(
                 PROJECT_ID))
         self.assertEqual(
             len(r.json()['clks']), 2,
-            msg='Unexpected output from GET /projects/{}/clks/0/2'.format(
+            msg='Unexpected output from GET /projects/{}/clks/'.format(
                 PROJECT_ID))
 
         # Delete the clks.
         r = requests.delete(
-            PREFIX + '/projects/{project_id}/clks/0/2'.format(
-                project_id=PROJECT_ID))
+            PREFIX + '/projects/{}/clks/'.format(PROJECT_ID),
+            params=dict(index_range_start=0,
+                        index_range_end=2))
         self.assertEqual(r.status_code, 204,
-            msg='Expected DELETE /projects/{}/clks/0/2 to succeed.'.format(
+            msg='Expected DELETE /projects/{}/clks/ to succeed.'.format(
                 PROJECT_ID))
 
         # They no longer exist.
         r = requests.get(
-            PREFIX + '/projects/{project_id}/clks'.format(
-                project_id=PROJECT_ID))
+            PREFIX + '/projects/{}/clks/status'.format(PROJECT_ID))
         self.assertEqual(
             r.status_code, 200,
-            msg='Expected GET /projects/{}/clks to succeed.'.format(
+            msg='Expected GET /projects/{}/clks/status to succeed.'.format(
                 PROJECT_ID))
         self.assertEqual(
-            r.json(), {'clks_status': []},
-            msg='Unexpected output from GET /projects/{}/clks'.format(
+            r.json(), {'clksStatus': []},
+            msg='Unexpected output from GET /projects/{}/clks/status'.format(
                 PROJECT_ID))
 
         r = requests.get(
-            PREFIX + '/projects/{project_id}/clks/0/2'.format(
-                project_id=PROJECT_ID))
+            PREFIX + '/projects/{}/clks/'.format(PROJECT_ID),
+            params=dict(index_range_start=0,
+                        index_range_end=2))
         self.assertEqual(
             r.status_code, 200,
-            msg='Expected GET /projects/{}/clks/0/2 to succeed.'.format(
+            msg='Expected GET /projects/{}/clks/ to succeed.'.format(
                 PROJECT_ID))
         self.assertEqual(
-            r.json(), {'clks': []},
-            msg='Unexpected output from GET /projects/{}/clks/0/2'.format(
+            r.json(), {'clks': [], 'responseMetadata': {'nextCursor': None}},
+            msg='Unexpected output from GET /projects/{}/clks/'.format(
                 PROJECT_ID))
 
         # Delete the project and check that the clks aren't there.
         requests.delete(PREFIX + '/projects/{}'.format(PROJECT_ID))
 
-        r = requests.get(PREFIX + '/projects/{}/clks'.format(PROJECT_ID))
+        r = requests.get(PREFIX + '/projects/{}/clks/status'.format(
+            PROJECT_ID))
         self.assertEqual(
             r.status_code, 404,
-            msg='Expected GET /projects/{}/clks to fail.'.format(PROJECT_ID))
-
-        r = requests.get(PREFIX + '/projects/{}/clks/0/2'.format(PROJECT_ID))
-        self.assertEqual(
-            r.status_code, 404,
-            msg='Expected GET /projects/{}/clks/0/2 to fail.'.format(
+            msg='Expected GET /projects/{}/clks/status to fail.'.format(
                 PROJECT_ID))
 
-        r = requests.delete(
-            PREFIX + '/projects/{}/clks/0/2'.format(PROJECT_ID))
+        r = requests.get(PREFIX + '/projects/{}/clks/'.format(PROJECT_ID),
+            params=dict(index_range_start=0,
+                        index_range_end=2))
         self.assertEqual(
             r.status_code, 404,
-            msg='Expected DELETE /projects/{}/clks/0/2 to fail.'.format(
+            msg='Expected GET /projects/{}/clks/ to fail.'.format(PROJECT_ID))
+
+        r = requests.delete(
+            PREFIX + '/projects/{}/clks/'.format(PROJECT_ID),
+            params=dict(index_range_start=0,
+                        index_range_end=2))
+        self.assertEqual(
+            r.status_code, 404,
+            msg='Expected DELETE /projects/{}/clks/ to fail.'.format(
                 PROJECT_ID))
 
     

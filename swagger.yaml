@@ -270,7 +270,7 @@ paths:
           examples:
             application/json: {"errMsg": "Project 'example-project' does not exist."}
 
-  /projects/{project_id}/clks:
+  /projects/{project_id}/clks/:
     parameters:
       - $ref: '#/parameters/project_id'
       - name: index_range_start
