@@ -1,0 +1,48 @@
+version: '3'
+services:
+  
+  service:
+    image: clkhash-service:latest
+    ports:
+     - "8000:8080"
+    environment:
+     - CLKHASH_SERVICE_DB_URI=postgresql://postgres:secret@postgres:5432/postgres
+     - CLKHASH_SERVICE_BROKER_URI=sqla+postgresql://postgres:secret@postgres:5432/postgres
+    entrypoint:
+     - waitress-serve
+     - --port=8080
+     - clkhash_service:connexion_app
+    depends_on:
+      - db_init
+      - postgres
+
+  worker:
+    image: clkhash-service:latest
+    environment:
+     - CLKHASH_SERVICE_DB_URI=postgresql://postgres:secret@postgres:5432/postgres
+     - CLKHASH_SERVICE_BROKER_URI=sqla+postgresql://postgres:secret@postgres:5432/postgres
+    entrypoint:
+     - celery
+     - -A
+     - clkhash_worker
+     - worker
+    depends_on:
+      - db_init
+      - postgres
+
+  db_init:
+    image: clkhash-service:latest
+    environment:
+     - CLKHASH_SERVICE_DB_URI=postgresql://postgres:secret@postgres:5432/postgres
+    entrypoint:
+     - python3
+     - database.py
+     - init
+    depends_on:
+      - postgres
+
+  postgres:
+    image: "postgres:11-alpine"
+    restart: always
+    environment:
+      POSTGRES_PASSWORD: secret

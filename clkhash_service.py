@@ -408,7 +408,8 @@ def shutdown_session(exception=None):
     db_session.remove()
 
 
+connexion_app.add_api('swagger.yaml')
+
 if __name__ == '__main__':
-    connexion_app.add_api('swagger.yaml')
     connexion_app.run(port=int(os.environ.get('HTTP_PORT', 8080)),
                       debug=True)
