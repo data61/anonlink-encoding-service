@@ -1,90 +1,22 @@
 # clkhash-service
 
-A simple REST api for [clkhash](https://github.com/n1analytics/clkhash)
+## Set up
 
-This proposal is to include a simple REST server (e.g. written in flask) and wrap it in a docker 
-image so that clkhash can easily used by other languages and systems.
-
-The server would simply provide a REST interface to hash PII data into CLKs. Because hashing can
-take a non trivial amount of time it probably makes sense to have an async api. This also allows
-for an incremental updates api - to come in a later version.
-
-Initial API:
-
-### Add a new linkage project
-```
-POST /api/projects
-{
-  "name": "my first set of hashes"
-  "schema": "TODO - WIP schema design...",
-  "keys": ["secret 1", "secret 2"] 
-}
-
-{
-  "id": "someprojectid"
-}
+The Clkhash Service can be run in Docker. Ensure you have Docker and Docker Compose. To build the container, run:
+```bash
+$ ./build.sh
 ```
 
-### Hash a bunch of PII
-
-```
-POST /api/projects/{someprojectid}
-{
-  "data": [
-    {"a feature label": "some feature observation", "email": "blah@example.com", ....}, 
-    {...},
-  ]
-}
-
-{
-  "status": "hashing",
-  "entities uploaded": 10000
-  "entities hashed": 0
-}
+Then to run the service with Docker Compose:
+```bash
+$ docker-compose up
 ```
 
-
-### Get hashing progress
-
-```
-GET /api/projects/{someprojectid}
-{
-  "status": "hashing",
-  "entities uploaded": 10000
-  "entities hashed": 0
-}
+The address of the web server can be found with:
+```bash
+$ docker port clkhash-service_service_1 "8080"
 ```
 
-### Get hash results
+## API
 
-```
-GET /api/projects/{someprojectid}/clks
-{
-  "clks": [
-    "Lots of base64 encoded CLKs....", ...
-  ]
-}
-```
-
-### Delete Project
-
-```
-DELETE /api/projects/{someprojectid}
-```
-
-Possibly delete pii or clks?
-```
-DELETE /api/projects/{someprojectid}/clks
-```
-
-# Running
-
-$ pip install -r requirements.txt
-$ FLASK_APP=server.py flask run
-
-
-Basic test
-
-    python example_usage.py
-    
-    
+The API has a Swagger 2.0 specification in swagger.yaml. There is a Jupyter notebook with an example in docs/demo.ipynb.
