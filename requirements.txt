@@ -10,7 +10,7 @@ click==6.7
 clickclick==1.2.2
 clkhash==0.11.0
 connexion==1.4.2
-cryptography==2.2.2
+cryptography==2.3.1
 Flask==1.0.2
 future==0.16.0
 idna==2.7
@@ -25,7 +25,7 @@ psycopg2==2.7.4
 pycparser==2.18
 pytz==2018.4
 PyYAML==3.12
-requests==2.19.0
+requests==2.20.0
 six==1.11.0
 SQLAlchemy==1.2.8
 swagger-spec-validator==2.3.1
