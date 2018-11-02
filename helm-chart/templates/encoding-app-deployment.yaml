@@ -1,0 +1,46 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: encoding-app
+  labels:
+    component: encoding-app
+    {{- include "release_labels" . | indent 4 }}
+spec:
+  replicas: {{ .Values.app.replicas}}
+  selector:
+    matchLabels:
+      release: {{ .Release.Name }}
+      component: encoding-app
+  template:
+    metadata:
+      labels:
+        {{- include "release_labels" . | indent 8 }}
+        component: encoding-app
+{{- if .Values.app.podAnnotations }}
+      annotations:
+{{ toYaml .Values.app.podAnnotations | indent 8 }}
+{{- end }}
+    spec:
+      containers:
+      - name: encoding-app
+        image: {{ .Values.app.image.repository }}:{{ .Values.app.image.tag }}
+        command:
+        - waitress-serve
+        - --port=8080
+        - clkhash_service:connexion_app
+        env:
+        - name: CLKHASH_SERVICE_BROKER_URI
+          valueFrom:
+            secretKeyRef:
+              name: encoding-secrets
+              key: brokerURI
+        - name: CLKHASH_SERVICE_DB_URI
+          valueFrom:
+            secretKeyRef:
+              name: encoding-secrets
+              key: databaseURI
+        ports:
+        - containerPort: 8080
+        resources:
+{{ toYaml .Values.app.resources | indent 12 }}
+      restartPolicy: Always

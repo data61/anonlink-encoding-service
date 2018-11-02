@@ -1,0 +1,42 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: encoding-worker
+  labels:
+    {{- include "release_labels" . | indent 4 }}
+    component: encoding-worker
+spec:
+  replicas: {{ .Values.workers.replicas }}
+  selector:
+    matchLabels:
+      release: {{ .Release.Name }}
+      component: encoding-worker
+  template:
+    metadata:
+      labels:
+        {{- include "release_labels" . | indent 8 }}
+        component: encoding-worker
+    spec:
+      containers:
+      - name: encoding-worker
+        image: {{ .Values.workers.image.repository }}:{{ .Values.workers.image.tag }}
+        command:
+        - celery
+        - -A
+        - clkhash_worker
+        - worker
+        env:
+        - name: CLKHASH_SERVICE_BROKER_URI
+          valueFrom:
+            secretKeyRef:
+              name: encoding-secrets
+              key: brokerURI
+        - name: CLKHASH_SERVICE_DB_URI
+          valueFrom:
+            secretKeyRef:
+              name: encoding-secrets
+              key: databaseURI
+
+        resources:
+{{ toYaml .Values.app.resources | indent 12 }}
+      restartPolicy: Always

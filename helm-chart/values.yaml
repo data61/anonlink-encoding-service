@@ -1,0 +1,64 @@
+debug: false
+
+app:
+  image:
+    repository: "quay.io/n1analytics/encoding-service"
+    tag: "latest"
+
+  replicas: 1
+  resources:
+    #limits:
+    #  memory: 512Mi
+    #  cpu: 4
+    requests:
+      cpu: 200m
+      memory: 256Mi
+
+  #podAnnotations:
+
+
+workers:
+  image:
+    repository: "quay.io/n1analytics/encoding-service"
+    tag: "latest"
+
+  replicas: 2
+  resources:
+    #limits:
+    #  memory: 512Mi
+    #  cpu: 4
+    requests:
+      cpu: 200m
+      memory: 256Mi
+
+
+provision:
+  postgresql: true
+
+jobs:
+  initdb:
+    enabled: true
+    image:
+      repository: "quay.io/n1analytics/encoding-service"
+      tag: "latest"
+
+
+postgresql:
+  # See available settings and defaults at:
+  # https://github.com/kubernetes/charts/tree/master/stable/postgresql
+  nameOverride: "postgres"
+  postgresPassword: "secret"
+  persistence:
+    enabled: true
+    storageClass: "default"
+    size: 4Gi
+  imageTag: 10.3
+  imagePullPolicy: IfNotPresent
+  metrics:
+    enabled: true
+  resources:
+    #limits:
+    #  memory: 8Gi
+    requests:
+      #memory: 1Gi
+      cpu: 100m

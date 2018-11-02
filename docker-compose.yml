@@ -1,8 +1,8 @@
 version: '3'
 services:
   
-  service:
-    image: clkhash-service:latest
+  encoding_app:
+    image: quay.io/n1analytics/encoding-service
     ports:
      - "8000:8080"
     environment:
@@ -13,11 +13,11 @@ services:
      - --port=8080
      - clkhash_service:connexion_app
     depends_on:
-      - db_init
+      - encoding_db_init
       - postgres
 
-  worker:
-    image: clkhash-service:latest
+  encoding_worker:
+    image: quay.io/n1analytics/encoding-service
     environment:
      - CLKHASH_SERVICE_DB_URI=postgresql://postgres:secret@postgres:5432/postgres
      - CLKHASH_SERVICE_BROKER_URI=sqla+postgresql://postgres:secret@postgres:5432/postgres
@@ -27,11 +27,13 @@ services:
      - clkhash_worker
      - worker
     depends_on:
-      - db_init
+      - encoding_db_init
       - postgres
+    deploy:
+      replicas: 2
 
-  db_init:
-    image: clkhash-service:latest
+  encoding_db_init:
+    image: quay.io/n1analytics/encoding-service
     environment:
      - CLKHASH_SERVICE_DB_URI=postgresql://postgres:secret@postgres:5432/postgres
     entrypoint:
@@ -46,3 +48,8 @@ services:
     restart: always
     environment:
       POSTGRES_PASSWORD: secret
+    volumes:
+      - psql:/var/lib/postgresql/data
+
+volumes:
+  psql:

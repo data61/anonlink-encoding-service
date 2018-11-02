@@ -1,4 +1,6 @@
-# clkhash-service
+[![Docker Repository on Quay](https://quay.io/repository/n1analytics/encoding-service/status "Docker Repository on Quay")](https://quay.io/repository/n1analytics/encoding-service)
+
+# Encoding Service
 
 ## Set up
 
