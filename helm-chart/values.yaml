@@ -51,8 +51,8 @@ postgresql:
   persistence:
     enabled: true
     storageClass: "default"
-    size: 4Gi
-  imageTag: 11
+    size: 8Gi
+  imageTag: "9.6.2"
   imagePullPolicy: IfNotPresent
   metrics:
     enabled: true
