@@ -1,10 +1,10 @@
 import enum
 import os
-import sys
+import time
 
 from sqlalchemy import (Column, create_engine, Enum, ForeignKey,
                         Integer, JSON, LargeBinary, String)
-from sqlalchemy.orm import relationship, scoped_session, sessionmaker
+from sqlalchemy.orm import scoped_session, sessionmaker
 from sqlalchemy.ext.declarative import declarative_base
 
 
@@ -55,7 +55,17 @@ def init_db():
 
 
 if __name__ == '__main__':
-    if len(sys.argv) == 2 and sys.argv[1] == 'init':
+    import argparse
+
+    parser = argparse.ArgumentParser()
+    parser.add_argument("command", help="Command to run")
+    parser.add_argument("-s", "--sleep", help="Delay in seconds before initializing database",
+                        type=float, default=1)
+    args = parser.parse_args()
+    time.sleep(args.sleep)
+
+    if args.command == 'init':
+        print("Initialising database...")
         init_db()
     else:
-        'To create database: python database.py init'
+        print('Command not recognized init')
