@@ -52,7 +52,7 @@ postgresql:
     enabled: true
     storageClass: "default"
     size: 4Gi
-  imageTag: 10.3
+  imageTag: 11
   imagePullPolicy: IfNotPresent
   metrics:
     enabled: true

@@ -1,12 +1,12 @@
 name: encoding-service
 description: A service for encoding PII into CLKs.
-version: 0.0.1
+version: 0.0.2
 keywords:
   - clks
 sources:
   - https://github.com/n1analytics/encoding-service/
-  - https://github.com/n1analytics/clkhash
+  - https://github.com/n1analytics/clkhash/
 maintainers:
-  - name: N1 Analytics
+  - name: Confidential Computing Team at CSIRO's Data61
     email: support@n1analytics.com
     url: https://n1analytics.com
