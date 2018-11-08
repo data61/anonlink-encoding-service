@@ -1,3 +1,4 @@
+{{- $dbAddress := printf "%s-%s" .Release.Name .Values.postgresql.nameOverride -}}
 {{- if .Values.jobs.initdb.enabled }}
 apiVersion: batch/v1
 kind: Job
@@ -15,6 +16,11 @@ spec:
       name: encoding-initdb
     spec:
       restartPolicy: "OnFailure"
+      initContainers:
+        - name: wait-for-db
+          image: postgres
+          command: ['sh', '-c',
+                    'until pg_isready -h {{ $dbAddress }} -p 5432; do echo "waiting for database"; sleep 2; done;']
       containers:
       - name: dbinit
         image: {{ .Values.jobs.initdb.image.repository }}:{{ .Values.jobs.initdb.image.tag }}
