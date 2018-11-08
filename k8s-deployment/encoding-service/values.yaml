@@ -16,6 +16,16 @@ app:
 
   #podAnnotations:
 
+service:
+  ## For minikube, set this to NodePort, elsewhere use LoadBalancer
+  ## Use ClusterIP if your setup includes an ingress controller.
+  type: "ClusterIP"
+  port: "80"
+
+  ## Set the LoadBalancer service type to internal only.
+  ## ref: https://kubernetes.io/docs/concepts/services-networking/service/#internal-load-balancer
+  # loadBalancerIP:
+
 
 workers:
   image:

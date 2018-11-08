@@ -41,6 +41,7 @@ spec:
               key: databaseURI
         ports:
         - containerPort: 8080
+          name: encodingservice
         resources:
 {{ toYaml .Values.app.resources | indent 12 }}
       restartPolicy: Always
