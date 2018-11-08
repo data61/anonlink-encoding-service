@@ -21,6 +21,7 @@ spec:
         command:
         - python3
         - database.py
+        - --sleep 60
         - init
         env:
         - name: CLKHASH_SERVICE_DB_URI
