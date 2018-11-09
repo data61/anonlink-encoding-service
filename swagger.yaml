@@ -1,16 +1,14 @@
 swagger: '2.0'
 
 info:
-  title: Clkhash REST API
-  version: 0.0.3
+  title: Encoding Service REST API
+  version: 0.1.0
   description: |
-    A simple REST wrapper around [clkhash](https://github.com/n1analytics/clkhash).
-
-    This API lets you upload personally identifying information (PII) for hashing, and to retrieve the hashes. It does not provide the option to download the raw PII.
+    This API lets you upload personally identifying information (PII) for encoding, and to retrieve the encodings. It does not provide the option to download the raw PII.
 
   contact:
     name: N1 Analytics
-    url: https://github.com/n1analytics/clkhash-service
+    url: https://github.com/n1analytics/encoding-service
     email: jakub.nabaglo@data61.csiro.au
 
 schemes:
@@ -20,8 +18,8 @@ tags:
   - name: projects
     description: A project is a namespace associated with a schema and keys. All uploaded data must belong to a project. Before uploading any private data, a project with some ID assigned by the user must be created.
 
-  - name: clks
-    description: These methods operate on the data and the hashes, permitting us to upload private information, view progress of the hashing, retrieve the clks, and delete information.
+  - name: encodings
+    description: These methods operate on the data and the encodings, permitting us to upload private information, view progress of the encoding, retrieve the encodings, and delete information.
 
 paths:
   /projects/:
@@ -30,7 +28,7 @@ paths:
       description: Lists the IDs of existing linkage projects. Every linkage project has a unique ID. To retrieve more information about a project, use `/projects/{project_id}`.
       tags:
         - projects
-      operationId: clkhash_service.get_projects
+      operationId: encoding_service.get_projects
       produces:
         - application/json
       responses:
@@ -38,83 +36,32 @@ paths:
           description: List of linkage projects. Every item in the list is a project ID.
           examples:
             application/json: {"projects": ["example-project", "another-project"]}
+          schema:
+            $ref: '#/definitions/projects_get_success'
 
     post:
       summary: Add a new linkage project.
       description: Create a new project. This permits us to save the schema and keys in the server and bind all related private data to the same ID. The keys uploaded here cannot be retrieved from the server.
       tags:
         - projects
-      operationId: clkhash_service.post_project
+      operationId: encoding_service.post_project
       consumes:
         - application/json
       parameters:
-        - name: schema
-          description: Controls the way the hashing is performed and the format of the fields. This must be consistent between the parties whose data is being linked. See documentation at http://clkhash.readthedocs.io/en/latest/schema.html.
+        - name: project_info
+          description: The input for the operation. See the schema.
           in: body
           required: true
           schema:
-            example:
-              version: 1
-              clkConfig:
-                l: 1024
-                k: 20
-                hash:
-                  type: doubleHash
-                kdf:
-                  type: HKDF
-                  hash: SHA256
-                  salt: SCbL2zHNnmsckfzchsNkZY9XoHk96P/G5nUBrM7ybymlEFsMV6PAeDZCNp3rfNUPCtLDMOGQHG4pCQpfhiHCyA==
-                  info: c2NoZW1hX2V4YW1wbGU=
-                  keySize: 64
-              features:
-                - identifier: NAME freetext
-                  format:
-                    type: string
-                    encoding: utf-8
-                    case: mixed
-                    minLength: 3
-                  hashing:
-                    ngram: 2
-                    weight: 0.5
-                - identifier: DOB YYYY/MM/DD
-                  format:
-                    type: string
-                    encoding: ascii
-                    description: Numbers separated by slashes, in the year, month, day order
-                    pattern: \d\d\d\d/\d\d/\d\d
-                  hashing:
-                    ngram: 1
-                    positional: true
-                - identifier: GENDER M or F
-                  format:
-                    type: enum
-                    values:
-                      - M
-                      - F
-                  hashing:
-                    ngram: 1
-                    weight: 2
-        - name: project_id
-          in: query
-          description: The ID of the linkage project. Must be unique.
-          required: true
-          type: string
-        - name: keys
-          description: Comma-separated keys. Each key is a base64 string. These need to be URL-encoded since base64 is not URL-safe by default.
-          in: query
-          type: string
-          required: true
+            $ref: '#/definitions/project_info'
       responses:
         '201':
-          description: Successfully created project. The response body is empty.
-        '409':
-          description: Project with this ID already exists. The `"errMsg"` key contains the error message.
-          examples:
-            application/json: {"errMsg": "Project 'example_project' already exists."}
+          description: Successfully created project. The response body contains the project ID.
+          schema:
+            $ref: '#/definitions/projects_post_success'
         '422':
-          description: The parameters are not valid. The `"errMsg"` key contains the error message.
-          examples:
-            application/json: {"errMsg": "The schema does not conform to the master schema."}
+          $ref: '#/responses/invalid_parameters'
+
 
   /projects/{project_id}:
     parameters:
@@ -122,86 +69,41 @@ paths:
 
     get:
       summary: Retrieve properties of the specified project.
-      description: Retrieves the public properties (currently the schema) of the specified object.
+      description: Retrieves the public properties, if any, of the specified object. In CLK hashing this is the schema; we do not reveal the keys.
       tags:
         - projects
-      operationId: clkhash_service.get_project
+      operationId: encoding_service.get_project
       responses:
         '200':
           description: Properties of specified object.
-          examples:
-            application/json:
-              projectId: example-project
-              schema:
-                version: 1
-                clkConfig:
-                  l: 1024
-                  k: 20
-                  hash:
-                    type: doubleHash
-                  kdf:
-                    type: HKDF
-                    hash: SHA256
-                    salt: SCbL2zHNnmsckfzchsNkZY9XoHk96P/G5nUBrM7ybymlEFsMV6PAeDZCNp3rfNUPCtLDMOGQHG4pCQpfhiHCyA==
-                    info: c2NoZW1hX2V4YW1wbGU=
-                    keySize: 64
-                features:
-                  - identifier: NAME freetext
-                    format:
-                      type: string
-                      encoding: utf-8
-                      case: mixed
-                      minLength: 3
-                    hashing:
-                      ngram: 2
-                      weight: 0.5
-                  - identifier: DOB YYYY/MM/DD
-                    format:
-                      type: string
-                      encoding: ascii
-                      description: Numbers separated by slashes, in the year, month, day order
-                      pattern: \d\d\d\d/\d\d/\d\d
-                    hashing:
-                      ngram: 1
-                      positional: true
-                  - identifier:
-                      format:
-                        type: enum
-                        values:
-                          - M
-                          - F
-                      hashing:
-                        ngram: 1
-                        weight: 2
+          schema:
+            $ref: '#/definitions/project_get_success'
         '404':
-          description: No such project. The `"errMsg"` key contains the error message.
-          examples:
-            application/json: {"errMsg": "Project 'example-project' does not exist."}
+          $ref: '#/responses/no_such_project'
 
     delete:
       summary: Delete the linkage project.
-      description: Deletes the linkage project, along with its schema and keys. This deletes any computed all hashes. If some hashing was still pending, those jobs are aborted.
+      description: Deletes the linkage project, along with its schema and keys. Deletes any computed encodings. If any encoding jobs are still pending, they are aborted.
       tags:
         - projects
-      operationId: clkhash_service.delete_project
+      operationId: encoding_service.delete_project
       responses:
         '204':
-          description: Successfully deleted. The response body is empty.
+          $ref: '#/responses/delete_success'
         '404':
-          description: No such project. The `"errMsg"` key contains the error message.
-          examples:
-            application/json: {"errMsg": "Project 'example-project' does not exist."}
+          $ref: '#/responses/no_such_project'
+
 
   /projects/{project_id}/pii/:
     parameters:
       - $ref: '#/parameters/project_id'
 
     post:
-      summary: Post PII to hash.
-      description: Save private information to the server and schedule the hashing. The private information cannot be retrieved from the API in its original form; only the hashes are made available. It is deleted as soon as the hash is produced.
+      summary: Post PII to encode.
+      description: Save private information to the server and schedule the encoding. The private information cannot be retrieved from the API in its original form; only the encodings are made available. It is deleted as soon as the encoding is produced.
       tags:
-        - clks
-      operationId: clkhash_service.post_pii
+        - encodings
+      operationId: encoding_service.post_pii
       consumes:
         - text/csv
       parameters:
@@ -215,154 +117,216 @@ paths:
               Jane Doe,1968/05/19,F
               Peter Griffin,1998/12/20,M
         - name: header
-          description: "Default 'true': the CSV input has a header row and we wish to validate the column names against the schema. Set to 'ignore' to skip the header row. Set to 'false' if the table does not have a header row."
+          description: |
+            Default `ignore`: the CSV input has a header row but we simply ignore it.
+
+            Set to `validate` if the CSV input has a header row and we wish to validate it. The encoding scheme must support data validation.
+
+            Set to `false` if the CSV input does not have a header row. The first row of the table is taken to contain a record.
           in: query
           type: string
-          enum: ['false', 'ignore', 'true']
+          enum: ['false', 'ignore', 'validate']
           required: false
-          default: 'true'
+          default: 'ignore'
         - name: validate
-          description: 'If `true`, validate the PII before hashing.'
+          description: 'If `true`, validate the PII before encoding. The encoding scheme must support validation. Default `false`.'
           in: query
           type: boolean
           required: false
-          default: true
+          default: false
       responses:
         '202':
-          description: Successfully sent for hashing. Returns the IDs of the post rows as a consecutive range. The range-end is inclusive.
-          examples:
-            application/json: {'dataIds': {'rangeStart': 0, 'rangeEnd': 1}}
-
+          description: "Hashing job successfully scheduled. This does not indicate success of the whole encoding operation: the asynchronous job might still fail."
         '404':
-          description: No such project. The `"errMsg"` key contains the error message.
-          examples:
-            application/json: {"errMsg": "Project 'example-project' does not exist."}
-
+          $ref: '#/responses/no_such_project'
         '422':
-          description: Invalid data. The `"errMsg"` key contains the error message.
-          examples:
-            application/json: {"errMsg": "Invalid entry on line 21."}
+          $ref: '#/responses/invalid_parameters'
 
-  /projects/{project_id}/clks/status:
+
+  /projects/{project_id}/encodings/status:
     parameters:
       - $ref: '#/parameters/project_id'
 
     get:
-      summary: Get status of all clks.
-      description: Returns the status of each clk. 
+      summary: Get progress of all encodings.
+      description: Returns the progress of each encoding.
       tags:
-        - clks
-      operationId: clkhash_service.get_clks_status
+        - encodings
+      operationId: encoding_service.get_encodings_status
       responses:
         '200':
-          description: The status of each clk, by index. For convenience, adjacent clks with the same status are grouped together. The list is empty if there are not clks. Each list element contains `rangeStart`, the first index included; `rangeEnd`, the last index included; and a `status` string. Possible statuses are `queued` (awaiting processing), `in-progress` (being processed now), `done` (ready for retrieval), `invalid-data` (data did not pass validation against the schema), and `error` (internal error).
-          examples:
-            application/json:
-              clksStatus:
-                - rangeStart: 0
-                  rangeEnd: 16003
-                  status: done
-                - rangeStart: 16002
-                  rangeEnd: 100003
-                  status: queued
+          description: |
+            The status of each encoding, by index. The list is empty if there are no encodings. Each list element contains an ID and the status.
+
+            Possible statuses are `queued` (awaiting processing), `in-progress` (being processed now), `done` (ready for retrieval), `invalid` (data did not pass validation against the schema), and `error` (internal error).
+          schema:
+            $ref: '#/definitions/encoding_status_success'
         '404':
-          description: No such project. The `"errMsg"` key contains the error message.
-          examples:
-            application/json: {"errMsg": "Project 'example-project' does not exist."}
+          $ref: '#/responses/no_such_project'
 
-  /projects/{project_id}/clks/:
+
+  /projects/{project_id}/encodings/:
     parameters:
       - $ref: '#/parameters/project_id'
-      - name: index_range_start
+      - name: ids
         in: query
-        description: The index of the first clk to operate on.
-        required: false
-        type: integer
-        minimum: 0
-      - name: index_range_end
-        in: query
-        description: The index of the last clk to operate on, plus one.
-        required: false
-        type: integer
-        minimum: 0
-      - name: status
-        in: query
-        description: Comma-separated list. Permits filtering on status. Only clks with their status listed here will be returned. Permitted statuses are `queued`, `in-progress`, `done`, `invalid-data`, and `error`.
-        required: false
-        type: string
-        minLength: 1
-
-    get:
-      summary: Retrieve the clks, if available.
-      description: Retrieve the index, status, and hash of each clk.
-      tags:
-        - clks
-      parameters:
-        - name: page_limit
-          in: query
-          description: The number of items per page. Leave this out to disable pagination.
-          required: false
-          type: integer
-          minimum: 1
-        - name: cursor
-          in: query
-          description: The cursor used to iterate through pages. This is returned by the previous response. Leave out to retrieve the first page.
-          required: false
+        description: A comma-separated list of IDs.
+        required: true
+        type: array
+        items:
           type: string
-          minLength: 1
-      operationId: clkhash_service.get_clks
+    
+    get:
+      summary: Retrieve the encodings, if available.
+      description: Retrieve the index, status, and digest (if available) of each encoding.
+      tags:
+        - encodings
+      operationId: encoding_service.get_encodings
       responses:
         '200':
-          description: The clks are returned along with their status. The hash is `null` where it has not been computed. The list is empty if there are no clks with IDs in the specified range. A `responseMetadata` object is returned. It contains a `nextCursor` string which must be passed in the next request to retrieve the next page; it is URL-safe, so no URL encoding is required. The `nextCursor` is `null` if no next page is available.
+          description: The specified encodings are returned along with their status. The encoding digest is `null` where it has not been computed.
           examples:
             application/json: 
               count: 2
-              clks:
-                - errMsg: Column `DOB YYYY/MM/DD` did not pass validation.
-                  hash: null
-                  index: 0
-                  status: invalid-data
-                - errMsg: null
-                  hash: 2wRKwCio1SQDeAAEowBECdwNGkAJgChviDATAHTDRCgQECHqxiEARgl+iLQADIspmCB7gcFUgKGIwvCMBAirULh5kkDaiTlAJowckX8A0BEgk8MgkABIF2EmByhJK6AiMwCGjlGYIlCCwiQAICED4QEgBAMsIBiAMBDkGyCSQAI=
-                  index: 1
+              encodings:
+                - id: '0'
+                  status: invalid
+                  errMsg: Column `DOB YYYY/MM/DD` did not pass validation.
+                - id: '1'
                   status: done
-              responseMetadata:
-                nextCursor: LTE0Nzg0OTA3ODA5NDE2MDA0MTk
-
+                  encoding: 2wRKwCio1SQDeAAEowBECdwNGkAJgChviDATAHTDRCgQECHqxiEARgl+iLQADIspmCB7gcFUgKGIwvCMBAirULh5kkDaiTlAJowckX8A0BEgk8MgkABIF2EmByhJK6AiMwCGjlGYIlCCwiQAICED4QEgBAMsIBiAMBDkGyCSQAI=
+                - id: '2'
+                  status: in-progress
         '404':
-          description: No such project. The `"errMsg"` key contains the error message.
-          examples:
-            application/json: {"errMsg": "Project 'example-project' does not exist."}
+          $ref: '#/responses/no_such_project'
         '422':
-          description: Invalid parameters. The `"errMsg"` key contains the error message.
-          examples:
-            application/json: {"errMsg": "The provided cursor is invalid."}
+          $ref: '#/responses/invalid_parameters'
 
     delete:
-      summary: If finished hashing, delete the clks. Otherwise, abandon hashing and delete the PII.
-      description: Deletes specified entry from the server, including any hashes and private data. If the hashing has not occured, cancels the scheduled job. If there are no clks within the specified range, do nothing.
+      summary: If finished encoding, delete the encodings. Otherwise, abandon encoding and delete the PII.
+      description: Deletes specified entry from the server, including any encodings and private data. If the encoding has not occured, cancels the scheduled job.
       tags:
-        - clks
-      operationId: clkhash_service.delete_clks
+        - encodings
+      operationId: encoding_service.delete_encodings
       responses:
         '204':
-          description: Successfully deleted. Number of deleted items specified in the payload. If there were no items within the range, this number will be 0.
-          examples:
-            application/json: 
-              count: 2
+          $ref: '#/responses/delete_success'
         '404':
-          description: No such project. The `"errMsg"` key contains the error message.
-          examples:
-            application/json: {"errMsg": "Project 'example-project' does not exist."}
+          $ref: '#/responses/no_such_project'
         '422':
-          description: Invalid parameters. The `"errMsg"` key contains the error message.
-          examples:
-            application/json: {"errMsg": "Error in argument `status`: 'obviously-wrong-status' is not a valid status."}
+          $ref: '#/responses/invalid_parameters'
+
+
+responses:
+  invalid_parameters:
+    description: Invalid parameters. The `"errMsg"` key contains the error message.
+    examples:
+      application/json: {"errMsg": "Error in argument `status`: 'obviously-wrong-status' is not a valid status."}
+    schema:
+      $ref: '#/definitions/error'
+  
+  no_such_project:
+    description: No such project. The `"errMsg"` key contains the error message.
+    examples:
+      application/json: {"errMsg": "Project 'example-project' does not exist."}
+    schema:
+      $ref: '#/definitions/error'
+  
+  delete_success:
+    description: Successfully deleted. The response body is empty.
+
+  
+definitions:
+  project_info:
+    type: object
+    required:
+      - scheme
+      - scheme_info
+    properties:
+      scheme:
+        type: string
+        enum: ['clk']
+      scheme_info:
+        type: object
+        required: ['schema', 'keys']
+        properties:
+          schema:
+            type: object
+          keys:
+            type: array
+            items:
+              type: string
+  
+  projects_post_success:
+    type: object
+    required:
+      - project_id
+    properties:
+      project_id:
+        type: string
+  
+  project_get_success:
+    type: object
+    required:
+      - scheme
+      - scheme_info
+    properties:
+      scheme:
+        type: string
+      scheme_info:
+        type: object
+        required:
+          - schema
+        properties:
+          schema:
+            type: object
+  
+  projects_get_success:
+    type: object
+    required:
+      - projects
+    properties:
+      projects:
+        type: array
+        items:
+          type: string
+  
+  encoding_status_success:
+    type: object
+    required:
+      - encoding_statuses
+    properties:
+      encoding_statuses:
+        type: array
+        items:
+          type: object
+          required:
+            - id
+            - status
+          properties:
+            id:
+              type: string
+            status:
+              type: string
+              enum: ['queued', 'in-progress', 'done', 'invalid', 'error']
+            errMsg:
+              type: string
+            encoding:
+              type: string
+
+  error:
+    type: object
+    required:
+      - errMsg
+    properties:
+      errMsg:
+        type: string
+
 
 parameters:
   project_id:
     name: project_id
     in: path
-    description: The ID of the linkage project. Must be unique.
+    description: The unique ID of the linkage project.
     required: true
     type: string
