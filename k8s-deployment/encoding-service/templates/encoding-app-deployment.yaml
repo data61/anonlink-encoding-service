@@ -21,6 +21,11 @@ spec:
 {{ toYaml .Values.app.podAnnotations | indent 8 }}
 {{- end }}
     spec:
+      initContainers:
+        - name: wait-for-db
+          image: postgres
+          command: ['sh', '-c',
+                    'until pg_isready -h {{ template "dbAddress" . }} -p 5432; do echo "waiting for database"; sleep 2; done;']
       containers:
       - name: encoding-app
         image: {{ .Values.app.image.repository }}:{{ .Values.app.image.tag }}

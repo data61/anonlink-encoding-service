@@ -14,6 +14,13 @@ We truncate at 63 chars because some Kubernetes name fields are limited to this 
 {{- printf "%s-%s" .Release.Name $name | trunc 63 | trimSuffix "-" -}}
 {{- end -}}
 
+{{/*
+Define the database URI because we need it in a few places.
+*/}}
+{{- define "dbAddress" -}}
+{{- printf "%s-%s" .Release.Name .Values.postgresql.nameOverride -}}
+{{- end -}}
+
 {{/* We define the release labels that will be applied to all deployments. */}}
 {{- define "release_labels" }}
 app: {{ template "fullname" . }}

@@ -17,6 +17,11 @@ spec:
         {{- include "release_labels" . | indent 8 }}
         component: encoding-worker
     spec:
+      initContainers:
+        - name: wait-for-db
+          image: postgres
+          command: ['sh', '-c',
+                    'until pg_isready -h {{ template "dbAddress" . }} -p 5432; do echo "waiting for database"; sleep 2; done;']
       containers:
       - name: encoding-worker
         image: {{ .Values.workers.image.repository }}:{{ .Values.workers.image.tag }}
@@ -36,7 +41,6 @@ spec:
             secretKeyRef:
               name: encoding-secrets
               key: databaseURI
-
         resources:
 {{ toYaml .Values.app.resources | indent 12 }}
       restartPolicy: Always
