@@ -1,0 +1,74 @@
+debug: false
+
+app:
+  image:
+    repository: "quay.io/n1analytics/encoding-service"
+    tag: "latest"
+
+  replicas: 1
+  resources:
+    #limits:
+    #  memory: 512Mi
+    #  cpu: 4
+    requests:
+      cpu: 200m
+      memory: 256Mi
+
+  #podAnnotations:
+
+service:
+  ## For minikube, set this to NodePort, elsewhere use LoadBalancer
+  ## Use ClusterIP if your setup includes an ingress controller.
+  type: "ClusterIP"
+  port: "80"
+
+  ## Set the LoadBalancer service type to internal only.
+  ## ref: https://kubernetes.io/docs/concepts/services-networking/service/#internal-load-balancer
+  # loadBalancerIP:
+
+
+workers:
+  image:
+    repository: "quay.io/n1analytics/encoding-service"
+    tag: "latest"
+
+  replicas: 2
+  resources:
+    #limits:
+    #  memory: 512Mi
+    #  cpu: 4
+    requests:
+      cpu: 200m
+      memory: 256Mi
+
+
+provision:
+  postgresql: true
+
+jobs:
+  initdb:
+    enabled: true
+    image:
+      repository: "quay.io/n1analytics/encoding-service"
+      tag: "latest"
+
+
+postgresql:
+  # See available settings and defaults at:
+  # https://github.com/kubernetes/charts/tree/master/stable/postgresql
+  nameOverride: "postgres"
+  postgresPassword: "secret"
+  persistence:
+    enabled: false
+    storageClass: "default"
+    size: 8Gi
+  imageTag: "9.6.2"
+  imagePullPolicy: IfNotPresent
+  metrics:
+    enabled: true
+  resources:
+    #limits:
+    #  memory: 8Gi
+    requests:
+      #memory: 1Gi
+      cpu: 100m
