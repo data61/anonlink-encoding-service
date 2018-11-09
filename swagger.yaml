@@ -4,11 +4,11 @@ info:
   title: Encoding Service REST API
   version: 0.1.0
   description: |
-    This API lets you upload personally identifying information (PII) for hashing, and to retrieve the hashes. It does not provide the option to download the raw PII.
+    This API lets you upload personally identifying information (PII) for encoding, and to retrieve the encodings. It does not provide the option to download the raw PII.
 
   contact:
     name: N1 Analytics
-    url: https://github.com/n1analytics/clkhash-service
+    url: https://github.com/n1analytics/encoding-service
     email: jakub.nabaglo@data61.csiro.au
 
 schemes:
@@ -18,8 +18,8 @@ tags:
   - name: projects
     description: A project is a namespace associated with a schema and keys. All uploaded data must belong to a project. Before uploading any private data, a project with some ID assigned by the user must be created.
 
-  - name: hashes
-    description: These methods operate on the data and the hashes, permitting us to upload private information, view progress of the hashing, retrieve the hashes, and delete information.
+  - name: encodings
+    description: These methods operate on the data and the encodings, permitting us to upload private information, view progress of the encoding, retrieve the encodings, and delete information.
 
 paths:
   /projects/:
@@ -83,7 +83,7 @@ paths:
 
     delete:
       summary: Delete the linkage project.
-      description: Deletes the linkage project, along with its schema and keys. Deletes any computed hashes. If any hashing jobs are still pending, they are aborted.
+      description: Deletes the linkage project, along with its schema and keys. Deletes any computed encodings. If any encoding jobs are still pending, they are aborted.
       tags:
         - projects
       operationId: encoding_service.delete_project
@@ -99,10 +99,10 @@ paths:
       - $ref: '#/parameters/project_id'
 
     post:
-      summary: Post PII to hash.
-      description: Save private information to the server and schedule the hashing. The private information cannot be retrieved from the API in its original form; only the hashes are made available. It is deleted as soon as the hash is produced.
+      summary: Post PII to encode.
+      description: Save private information to the server and schedule the encoding. The private information cannot be retrieved from the API in its original form; only the encodings are made available. It is deleted as soon as the encoding is produced.
       tags:
-        - hashes
+        - encodings
       operationId: encoding_service.post_pii
       consumes:
         - text/csv
@@ -120,52 +120,52 @@ paths:
           description: |
             Default `ignore`: the CSV input has a header row but we simply ignore it.
 
-            Set to `validate` if the CSV input has a header row and we wish to validate it. The hashing scheme must support data validation.
+            Set to `validate` if the CSV input has a header row and we wish to validate it. The encoding scheme must support data validation.
 
             Set to `false` if the CSV input does not have a header row. The first row of the table is taken to contain a record.
           in: query
           type: string
-          enum: ['false', 'ignore', 'true']
+          enum: ['false', 'ignore', 'validate']
           required: false
           default: 'ignore'
         - name: validate
-          description: 'If `true`, validate the PII before hashing. The hashing scheme must support validation. Default `false`.'
+          description: 'If `true`, validate the PII before encoding. The encoding scheme must support validation. Default `false`.'
           in: query
           type: boolean
           required: false
           default: false
       responses:
         '202':
-          description: "Hashing job successfully scheduled. This does not indicate success of the whole hashing operation: the asynchronous job might still fail."
+          description: "Hashing job successfully scheduled. This does not indicate success of the whole encoding operation: the asynchronous job might still fail."
         '404':
           $ref: '#/responses/no_such_project'
         '422':
           $ref: '#/responses/invalid_parameters'
 
 
-  /projects/{project_id}/hashes/status:
+  /projects/{project_id}/encodings/status:
     parameters:
       - $ref: '#/parameters/project_id'
 
     get:
-      summary: Get progress of all hashes.
-      description: Returns the progress of each hash.
+      summary: Get progress of all encodings.
+      description: Returns the progress of each encoding.
       tags:
-        - hashes
-      operationId: encoding_service.get_hashes_status
+        - encodings
+      operationId: encoding_service.get_encodings_status
       responses:
         '200':
           description: |
-            The status of each hash, by index. The list is empty if there are no hashes. Each list element contains an ID and the status.
+            The status of each encoding, by index. The list is empty if there are no encodings. Each list element contains an ID and the status.
 
             Possible statuses are `queued` (awaiting processing), `in-progress` (being processed now), `done` (ready for retrieval), `invalid` (data did not pass validation against the schema), and `error` (internal error).
           schema:
-            $ref: '#/definitions/hash_status_success'
+            $ref: '#/definitions/encoding_status_success'
         '404':
           $ref: '#/responses/no_such_project'
 
 
-  /projects/{project_id}/hashes/:
+  /projects/{project_id}/encodings/:
     parameters:
       - $ref: '#/parameters/project_id'
       - name: ids
@@ -177,24 +177,24 @@ paths:
           type: string
     
     get:
-      summary: Retrieve the hashes, if available.
-      description: Retrieve the index, status, and digest (if available) of each hash.
+      summary: Retrieve the encodings, if available.
+      description: Retrieve the index, status, and digest (if available) of each encoding.
       tags:
-        - hashes
-      operationId: encoding_service.get_hashes
+        - encodings
+      operationId: encoding_service.get_encodings
       responses:
         '200':
-          description: The specified hashes are returned along with their status. The hash digest is `null` where it has not been computed.
+          description: The specified encodings are returned along with their status. The encoding digest is `null` where it has not been computed.
           examples:
             application/json: 
               count: 2
-              hashes:
+              encodings:
                 - id: '0'
                   status: invalid
                   errMsg: Column `DOB YYYY/MM/DD` did not pass validation.
                 - id: '1'
                   status: done
-                  hash: 2wRKwCio1SQDeAAEowBECdwNGkAJgChviDATAHTDRCgQECHqxiEARgl+iLQADIspmCB7gcFUgKGIwvCMBAirULh5kkDaiTlAJowckX8A0BEgk8MgkABIF2EmByhJK6AiMwCGjlGYIlCCwiQAICED4QEgBAMsIBiAMBDkGyCSQAI=
+                  encoding: 2wRKwCio1SQDeAAEowBECdwNGkAJgChviDATAHTDRCgQECHqxiEARgl+iLQADIspmCB7gcFUgKGIwvCMBAirULh5kkDaiTlAJowckX8A0BEgk8MgkABIF2EmByhJK6AiMwCGjlGYIlCCwiQAICED4QEgBAMsIBiAMBDkGyCSQAI=
                 - id: '2'
                   status: in-progress
         '404':
@@ -203,11 +203,11 @@ paths:
           $ref: '#/responses/invalid_parameters'
 
     delete:
-      summary: If finished hashing, delete the hashes. Otherwise, abandon hashing and delete the PII.
-      description: Deletes specified entry from the server, including any hashes and private data. If the hashing has not occured, cancels the scheduled job.
+      summary: If finished encoding, delete the encodings. Otherwise, abandon encoding and delete the PII.
+      description: Deletes specified entry from the server, including any encodings and private data. If the encoding has not occured, cancels the scheduled job.
       tags:
-        - hashes
-      operationId: encoding_service.delete_hashes
+        - encodings
+      operationId: encoding_service.delete_encodings
       responses:
         '204':
           $ref: '#/responses/delete_success'
@@ -291,12 +291,12 @@ definitions:
         items:
           type: string
   
-  hash_status_success:
+  encoding_status_success:
     type: object
     required:
-      - hash_statuses
+      - encoding_statuses
     properties:
-      hash_statuses:
+      encoding_statuses:
         type: array
         items:
           type: object
@@ -311,7 +311,7 @@ definitions:
               enum: ['queued', 'in-progress', 'done', 'invalid', 'error']
             errMsg:
               type: string
-            hash:
+            encoding:
               type: string
 
   error:
