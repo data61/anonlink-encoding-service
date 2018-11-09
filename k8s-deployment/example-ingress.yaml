@@ -1,0 +1,19 @@
+apiVersion: extensions/v1beta1
+kind: Ingress
+metadata:
+  name: encoding-ingress
+  annotations:
+    certmanager.k8s.io/cluster-issuer: letsencrypt-cluster-issuer
+spec:
+  tls:
+  - secretName: encoding-data61-xyz
+    hosts:
+    - encoding.data61.xyz
+  rules:
+  - host: encoding.data61.xyz
+    http:
+      paths:
+      - path: /
+        backend:
+          serviceName: encoding-app
+          servicePort: 80
