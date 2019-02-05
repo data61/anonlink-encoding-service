@@ -73,7 +73,10 @@ def _abort_if_project_not_found(function):
 
 def _intersperse(iterable, item):
     iterator = iter(iterable)  # Remember where we left off
-    yield next(iterator)  # Exit StopIteration if empty
+    try:
+        yield next(iterator)
+    except StopIteration:
+        return
     for i in iterator:
         yield item
         yield i
