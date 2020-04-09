@@ -1,8 +1,8 @@
-version: '3'
+version: '3.4'
 services:
   
   encoding_app:
-    image: quay.io/n1analytics/encoding-service
+    image: data61/anonlink-encoding-service:latest
     ports:
      - "8000:8080"
     environment:
@@ -17,11 +17,11 @@ services:
       - postgres
 
   encoding_worker:
-    image: quay.io/n1analytics/encoding-service
+    image: data61/anonlink-encoding-service:latest
     environment:
      - CLKHASH_SERVICE_DB_URI=postgresql://postgres:secret@postgres:5432/postgres
      - CLKHASH_SERVICE_BROKER_URI=sqla+postgresql://postgres:secret@postgres:5432/postgres
-    entrypoint:
+    command:
      - celery
      - -A
      - clkhash_worker
@@ -29,11 +29,9 @@ services:
     depends_on:
       - encoding_db_init
       - postgres
-    deploy:
-      replicas: 2
 
   encoding_db_init:
-    image: quay.io/n1analytics/encoding-service
+    image: data61/anonlink-encoding-service:latest
     environment:
      - CLKHASH_SERVICE_DB_URI=postgresql://postgres:secret@postgres:5432/postgres
     entrypoint:
@@ -44,12 +42,17 @@ services:
       - postgres
 
   postgres:
-    image: "postgres:11-alpine"
+    image: "postgres:11"
     restart: always
     environment:
       POSTGRES_PASSWORD: secret
     volumes:
       - psql:/var/lib/postgresql/data
+    healthcheck:
+      test: pg_isready -q -h db -p 5432 -U postgres
+      interval: 5s
+      timeout: 30s
+      retries: 5
 
 volumes:
   psql:
