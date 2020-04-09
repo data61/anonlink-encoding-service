@@ -108,7 +108,8 @@ def get_projects():
     }
 
 
-def post_project(schema, project_id, keys):
+def post_project(project_id, keys, body):
+    schema = body
     # Check that the schema is valid.
     try:
         clkhash.schema.validate_schema_dict(schema)
@@ -224,7 +225,8 @@ def get_clks_status(project_id):
 
 
 @_abort_if_project_not_found
-def post_pii(project_id, pii_table, header, validate):
+def post_pii(project_id, body, header, validate):
+    pii_table = body
     pii_table = pii_table.decode(request.charset)
     pii_table_stream = io.StringIO(pii_table)
 
@@ -411,7 +413,7 @@ def shutdown_session(exception=None):
     db_session.remove()
 
 
-connexion_app.add_api('swagger.yaml')
+connexion_app.add_api('openapi.yaml')
 
 if __name__ == '__main__':
     connexion_app.run(port=int(os.environ.get('HTTP_PORT', 8080)),
