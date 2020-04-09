@@ -1,7 +1,7 @@
 
 # Installing the encoding service using helm
 
-## Add the N1 Analytics chart repo
+## Add the CSIRO's Data61 chart repo
 
     helm repo add n1 https://n1analytics.github.io/charts
 

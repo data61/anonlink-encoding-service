@@ -6,7 +6,7 @@ COPY requirements.txt /var/www/
 USER root
 RUN pip install --upgrade -r requirements.txt
 
-COPY clkhash_service.py clkhash_worker.py database.py swagger.yaml requirements.txt /var/www/
+COPY clkhash_service.py clkhash_worker.py database.py openapi.yaml requirements.txt /var/www/
 
 RUN chown user:user /var/www
 USER user
