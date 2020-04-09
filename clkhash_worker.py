@@ -6,6 +6,7 @@ import clkhash
 import clkhash.validate_data
 import sqlalchemy.exc
 import sqlalchemy.orm
+from clkhash.comparators import NonComparison
 
 from database import Clk, ClkStatus, db_session, Project
 
@@ -23,7 +24,7 @@ logger.info("Setting up celery worker...")
 
 
 def _get_mapping_for_hash(project_id, key_lists,
-                          schema, tokenizers, hash_properties,
+                          schema, comparators,
                           validate,
                           r):
     try:
@@ -37,9 +38,7 @@ def _get_mapping_for_hash(project_id, key_lists,
             project_id=project_id, index=r.index,
             err_msg=msg, pii=None, status=ClkStatus.INVALID_DATA)
     else:
-        bf, _, _ = clkhash.bloomfilter.crypto_bloom_filter(
-            r.pii, tokenizers, schema.fields,
-            key_lists, hash_properties)
+        bf, _, _ = clkhash.bloomfilter.crypto_bloom_filter(r.pii, comparators, schema, key_lists)
 
         mapping = dict(
             project_id=project_id, index=r.index,
@@ -75,24 +74,26 @@ def hash(project_id, validate, start_index, end_index):
             logger.info('{}-{}: Project deleted. Exiting early.'.format(
                 start_index, end_index))
 
-        schema = clkhash.schema.Schema.from_json_dict(project.schema)
-        key_lists = clkhash.key_derivation.generate_key_lists(
-            project.keys,
-            len(schema.fields),
-            key_size=schema.hashing_globals.kdf_key_size,
-            salt=schema.hashing_globals.kdf_salt,
-            info=schema.hashing_globals.kdf_info,
-            kdf=schema.hashing_globals.kdf_type,
-            hash_algo=schema.hashing_globals.kdf_hash)
+        schema = clkhash.schema.from_json_dict(project.schema)
 
-        tokenizers = [clkhash.tokenizer.get_tokenizer(field.hashing_properties)
-              for field in schema.fields]
-        hash_properties = schema.hashing_globals
+        key_lists = clkhash.key_derivation.generate_key_lists(
+            # TODO cf https://github.com/data61/anonlink-encoding-service/issues/58
+            ''.join(project.keys),
+            len(schema.fields),
+            key_size=schema.kdf_key_size,
+            salt=schema.kdf_salt,
+            info=schema.kdf_info,
+            kdf=schema.kdf_type,
+            hash_algo=schema.kdf_hash)
 
         records = db_session.query(Clk).filter(
             Clk.project_id == project_id,
             Clk.index >= start_index,
             Clk.index < end_index)
+
+        comparators = [field.hashing_properties.comparator
+                       if field.hashing_properties is not None else NonComparison()
+                       for field in schema.fields]
 
         mappings = []
         for r in records:
@@ -100,10 +101,7 @@ def hash(project_id, validate, start_index, end_index):
             # Clks even if we error.
             mapping = None
             try:
-                mapping = _get_mapping_for_hash(
-                    project_id, key_lists, schema, tokenizers, hash_properties,
-                    validate,
-                    r)
+                mapping = _get_mapping_for_hash(project_id, key_lists, schema, comparators, validate, r)
             except Exception as e:
                 logger.warning('Exception while hashing: {}'.format(e))
                 mapping = dict(

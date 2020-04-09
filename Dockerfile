@@ -1,16 +1,14 @@
-FROM alpine:3.7
-MAINTAINER Jakub Nabaglo "jakub.nabaglo@data61.csiro.au"
+ARG VERSION=6fc6226b427c7361e073894ed56450dfea8ec89bec4d4e869c5702bcab5d5cae
+FROM data61/anonlink-base:${VERSION}
+MAINTAINER Anonlink Developers "anonlink@googlegroups.com"
 
-COPY clkhash_service.py clkhash_worker.py database.py swagger.yaml requirements.txt /clkhash-service/
-WORKDIR /clkhash-service
+COPY requirements.txt /var/www/
+USER root
+RUN pip install --upgrade -r requirements.txt
 
-RUN apk add --no-cache python3 libpq \
-    && apk add --no-cache --virtual .build-deps g++ python3-dev postgresql-dev libffi-dev \
-    && pip3 install --upgrade pip \
-    && pip3 install --upgrade -r requirements.txt \
-    && apk del --no-cache .build-deps \
-    && rm -fr /tmp/* /var/cache/apk/* /root/.cache/pip
+COPY clkhash_service.py clkhash_worker.py database.py swagger.yaml requirements.txt /var/www/
 
-RUN adduser -D -H -h /var/www user \
-    && chown user:user /clkhash-service
+RUN chown user:user /var/www
 USER user
+
+WORKDIR /var/www

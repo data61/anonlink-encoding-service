@@ -246,7 +246,7 @@ def post_pii(project_id, pii_table, header, validate):
                 # Project deleted in the meantime
                 _abort_project_id_not_found(project_id)
 
-            schema = clkhash.schema.Schema.from_json_dict(project.schema)
+            schema = clkhash.schema.from_json_dict(project.schema)
             try:
                 clkhash.validate_data.validate_header(schema.fields, headings)
             except clkhash.validate_data.FormatError as e:

@@ -1,3 +1,3 @@
 #!/usr/bin/env bash
 
-docker build -t clkhash-service:latest --rm .
+docker build -t data61/anonlink-encoding-service:latest --rm .

@@ -5,7 +5,7 @@ import unittest
 
 import requests
 
-PREFIX = os.environ['CLKHASH_SERVICE_PREFIX']
+PREFIX = os.getenv('CLKHASH_SERVICE_PREFIX', 'http://0.0.0.0:8000')
 
 PROJECT_ID = 'test-data'
 KEYS = b'correct', b'horse'
@@ -135,7 +135,7 @@ class TestProjects(unittest.TestCase):
         r = requests.get(PREFIX + '/projects')
         self.assertEqual(r.status_code, 200,
                          msg='Expected GET /projects to succeed.')
-        self.assertEqual(r.json(), {'projects': ['test-data']},
+        self.assertIn(PROJECT_ID, r.json()['projects'],
                          msg='Unexpected output from GET /projects.')
 
         r = requests.get(PREFIX + '/projects/{}'.format(PROJECT_ID))
@@ -156,7 +156,7 @@ class TestProjects(unittest.TestCase):
         r = requests.get(PREFIX + '/projects')
         self.assertEqual(r.status_code, 200,
                          msg='Expected GET /projects to succeed.')
-        self.assertEqual(r.json(), {'projects': []},
+        self.assertNotIn(PROJECT_ID, r.json()['projects'],
                          msg='Unexpected output from GET /projects.')
 
         r = requests.get(PREFIX + '/projects/{}'.format(PROJECT_ID))
@@ -271,7 +271,7 @@ class TestClks(unittest.TestCase):
                 PROJECT_ID))
 
         # Wait a second for clks to get processed
-        time.sleep(1)
+        time.sleep(0.5)
 
         # We can get these clks.
         r = requests.get(
