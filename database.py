@@ -35,7 +35,7 @@ class Project(Base):
 
     id = Column(String, primary_key=True)
     schema = Column(JSON, nullable=False)
-    keys = Column(JSON, nullable=False)
+    key = Column(String, nullable=False)
     clk_count = Column(Integer, nullable=False, server_default='0')
 
 

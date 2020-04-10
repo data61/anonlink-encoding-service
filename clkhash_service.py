@@ -108,7 +108,7 @@ def get_projects():
     }
 
 
-def post_project(project_id, keys, body):
+def post_project(project_id, secret_key, body):
     schema = body
     # Check that the schema is valid.
     try:
@@ -117,21 +117,20 @@ def post_project(project_id, keys, body):
         msg, *_ = e.args
         _abort_with_msg('invalid schema\n\n{}'.format(msg), 422)
 
-    # Store keys as array of base64 strings
-    b64_keys = list(map(urllib.parse.unquote, keys.split(',')))
+    # unquote secret key (will still be a base64 string)
+    b64_secret_key = urllib.parse.unquote(secret_key)
 
     # Validate the base64:
-    for b64_key in b64_keys:
-        try:
-            base64.b64decode(b64_key, validate=True)
-        except ValueError:
-            msg = "'{}' is not a valid base64 string".format(b64_key)
-            _abort_with_msg(msg, 422)
+    try:
+        base64.b64decode(b64_secret_key, validate=True)
+    except ValueError:
+        msg = "'{}' is not a valid base64 string".format(b64_secret_key)
+        _abort_with_msg(msg, 422)
 
     project = Project(
         id=project_id,
         schema=schema,
-        keys=b64_keys)
+        key=b64_secret_key)
     db_session.add(project)
 
     try:
