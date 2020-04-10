@@ -68,17 +68,17 @@ def hash(project_id, validate, start_index, end_index):
             project = db_session.query(Project).filter(
                     Project.id == project_id
                 ).options(
-                    sqlalchemy.orm.load_only(Project.schema, Project.keys)
+                    sqlalchemy.orm.load_only(Project.schema, Project.key)
                 ).one()
         except sqlalchemy.orm.exc.NoResultFound:
             logger.info('{}-{}: Project deleted. Exiting early.'.format(
                 start_index, end_index))
+            return
 
         schema = clkhash.schema.from_json_dict(project.schema)
 
         key_lists = clkhash.key_derivation.generate_key_lists(
-            # TODO cf https://github.com/data61/anonlink-encoding-service/issues/58
-            ''.join(project.keys),
+            project.key,
             len(schema.fields),
             key_size=schema.kdf_key_size,
             salt=schema.kdf_salt,

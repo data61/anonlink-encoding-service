@@ -8,7 +8,7 @@ import requests
 PREFIX = os.getenv('CLKHASH_SERVICE_PREFIX', 'http://0.0.0.0:8000')
 
 PROJECT_ID = 'test-data'
-KEYS = b'correct', b'horse'
+KEY = b'correct horse staple battery'
 SCHEMA = {
     'version': 1,
     'clkConfig': {
@@ -98,7 +98,7 @@ class TestProjects(unittest.TestCase):
                 project_id=PROJECT_ID),
             params=dict(
                 project_id=PROJECT_ID,
-                keys=b','.join(map(base64.b64encode, KEYS))),
+                secret_key=base64.b64encode(KEY)),
             json=["Oh no this won't work."])
         self.assertEqual(
             r.status_code, 422,
@@ -111,7 +111,7 @@ class TestProjects(unittest.TestCase):
                 project_id=PROJECT_ID),
             params=dict(
                 project_id=PROJECT_ID,
-                keys=b','.join(map(base64.b64encode, KEYS))),
+                secret_key=base64.b64encode(KEY)),
             json=SCHEMA)
         self.assertEqual(
             r.status_code, 201,
@@ -124,7 +124,7 @@ class TestProjects(unittest.TestCase):
                 project_id=PROJECT_ID),
             params=dict(
                 project_id=PROJECT_ID,
-                keys=b','.join(map(base64.b64encode, KEYS))),
+                secret_key=base64.b64encode(KEY)),
             json=SCHEMA)
         self.assertEqual(
             r.status_code, 409,
@@ -208,7 +208,7 @@ class TestClks(unittest.TestCase):
             PREFIX + '/projects/',
             params=dict(
                 project_id=PROJECT_ID,
-                keys=b','.join(map(base64.b64encode, KEYS))),
+                secret_key=base64.b64encode(KEY)),
             json=SCHEMA)
         self.assertEqual(
             r.status_code, 201,

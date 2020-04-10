@@ -65,8 +65,8 @@ paths:
           required: true
           schema:
             type: string
-        - name: keys
-          description: Comma-separated keys. Each key is a base64 string. These need to be
+        - name: secret_key
+          description: A base64 encoding string of the shared secret. These need to be
             URL-encoded since base64 is not URL-safe by default.
           in: query
           required: true
