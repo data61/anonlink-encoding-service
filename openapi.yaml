@@ -6,7 +6,7 @@ info:
   x-logo:
     url: http://clkhash.readthedocs.io/en/latest/_static/logo.svg
   description: |
-    A simple REST wrapper around [clkhash](https://github.com/n1analytics/clkhash).
+    A simple REST wrapper around [clkhash](https://github.com/data61/clkhash).
 
     This API lets you upload personally identifying information (PII) for hashing, and to retrieve the hashes.
     It does not provide the option to download the raw PII.
