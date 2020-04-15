@@ -2,7 +2,7 @@ debug: false
 
 app:
   image:
-    repository: "quay.io/n1analytics/encoding-service"
+    repository: "data61/anonlink-encoding-service"
     tag: "latest"
 
   replicas: 1
@@ -29,7 +29,7 @@ service:
 
 workers:
   image:
-    repository: "quay.io/n1analytics/encoding-service"
+    repository: "data61/anonlink-encoding-service"
     tag: "latest"
 
   replicas: 2
@@ -49,7 +49,7 @@ jobs:
   initdb:
     enabled: true
     image:
-      repository: "quay.io/n1analytics/encoding-service"
+      repository: "data61/anonlink-encoding-service"
       tag: "latest"
 
 
