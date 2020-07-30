@@ -34,10 +34,7 @@ services:
     image: data61/anonlink-encoding-service:latest
     environment:
      - CLKHASH_SERVICE_DB_URI=postgresql://postgres:secret@postgres:5432/postgres
-    entrypoint:
-     - python3
-     - database.py
-     - init
+    entrypoint: /bin/sh -c "dockerize -wait tcp://postgres:5432 python3 database.py init"
     depends_on:
       - postgres
 
