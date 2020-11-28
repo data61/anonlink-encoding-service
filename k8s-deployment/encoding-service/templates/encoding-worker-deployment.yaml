@@ -9,7 +9,7 @@ spec:
   replicas: {{ .Values.workers.replicas }}
   selector:
     matchLabels:
-      release: {{ .Release.Name }}
+      app.kubernetes.io/instance: {{ .Release.Name }}
       component: encoding-worker
   template:
     metadata:
