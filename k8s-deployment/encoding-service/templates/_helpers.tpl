@@ -24,13 +24,14 @@ Define the database URI because we need it in a few places.
 {{/* We define the release labels that will be applied to all deployments. */}}
 {{- define "release_labels" }}
 app: {{ template "fullname" . }}
-chart: {{ .Chart.Name }}-{{ .Chart.Version }}
-# The "heritage" label is used to track which tool deployed a given chart.
+app.kubernetes.io/name: {{ template "fullname" . }}
+helm.sh/chart: {{ .Chart.Name }}-{{ .Chart.Version }}
+# The "managed-by" label is used to track which tool deployed a given chart.
 # It is useful for admins who want to see what releases a particular tool
 # is responsible for.
-heritage: {{ .Release.Service }}
+app.kubernetes.io/managed-by: {{ .Release.Service }}
 version: {{ .Chart.Version | quote }}
-# The "release" convention makes it easy to tie a release to all of the
+# The "instance" convention makes it easy to tie a release to all of the
 # Kubernetes resources that were created as part of that release.
-release: {{ .Release.Name }}
+app.kubernetes.io/instance: {{ .Release.Name }}
 {{- end }}

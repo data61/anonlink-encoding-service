@@ -19,13 +19,21 @@ app:
 service:
   ## For minikube, set this to NodePort, elsewhere use LoadBalancer
   ## Use ClusterIP if your setup includes an ingress controller.
-  type: "ClusterIP"
-  port: "80"
+  type: ClusterIP
+  servicePort: 80
 
-  ## Set the LoadBalancer service type to internal only.
-  ## ref: https://kubernetes.io/docs/concepts/services-networking/service/#internal-load-balancer
+  annotations: {}
+
+  labels: {}
+
+  ## Use loadBalancerIP to request a specific static IP,
+  ## otherwise leave blank
+  ##
   # loadBalancerIP:
 
+  ## Address that are allowed when svc is LoadBalancer
+  ##
+  loadBalancerSourceRanges: []
 
 workers:
   image:
@@ -52,18 +60,22 @@ jobs:
       repository: "data61/anonlink-encoding-service"
       tag: "latest"
 
+global:
+  postgresql:
+    postgresqlDatabase: "postgres"
+    postgresqlUsername: "postgres"
+    postgresqlPassword: "secret"
 
 postgresql:
   # See available settings and defaults at:
-  # https://github.com/kubernetes/charts/tree/master/stable/postgresql
+  # https://github.com/bitnami/charts/tree/master/bitnami/postgresql
   nameOverride: "postgres"
-  postgresPassword: "secret"
+
   persistence:
     enabled: false
     storageClass: "default"
     size: 8Gi
-  imageTag: "9.6.2"
-  imagePullPolicy: IfNotPresent
+
   metrics:
     enabled: true
   resources:
