@@ -1,6 +1,6 @@
 bitarray-hardbyte==1.2.2
 celery==4.4.2
-clkhash==0.16.0
+clkhash==0.16.1
 connexion[swagger-ui]==2.6.0
 Flask==1.1.2
 jsonschema==3.2.0
