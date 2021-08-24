@@ -1,12 +1,12 @@
 bitarray-hardbyte==1.2.2
 celery==4.4.2
 clkhash==0.16.0
-connexion[swagger-ui]==2.6.0
+connexion[swagger-ui]==2.9.0
 Flask==1.1.2
 jsonschema==3.2.0
 mypy-extensions==0.4.3
 psycopg2==2.8.6
 requests==2.25.0
-SQLAlchemy==1.3.20
+SQLAlchemy==1.4.23
 waitress==1.4.3
 pytest==5.4.1
