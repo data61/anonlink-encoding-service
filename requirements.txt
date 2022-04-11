@@ -1,5 +1,5 @@
 bitarray-hardbyte==1.2.2
-celery==4.4.2
+celery==5.2.6
 clkhash==0.16.0
 connexion[swagger-ui]==2.6.0
 Flask==1.1.2
